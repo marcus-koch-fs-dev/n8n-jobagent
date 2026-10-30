@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Job-Agent: Stellen öffnen",
+  "version": "1.1",
+  "description": "Öffnet Stellen von der Job-Agent-Ergebnis-Seite (localhost:3000) als Tab-Gruppe oder in einem neuen Fenster.",
+  "permissions": ["tabGroups"],
+  "background": { "service_worker": "background.js" },
+  "externally_connectable": { "matches": ["http://localhost:3000/*"] },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvubVf0UGBKuFDhpVKiXMBTLBdTxRRqKIiFtU93bvQ2WcZbJRerh2YeTEchQ1dxXk1jmvaGjaf86T6ITF8Nt1Rr6LfhUUgPRMjaMTrxYeoFLJSPQG2VDpjw9EhT73xR7UpXHfJFWjAhDM1p3W2V+6egMuWQg8gbP6vF7Mb1PuEbxQp+e9lKYvdINVuNohDJOuHuDOo48UMkpnr2n0vxAKl542w/0Y+3U/EDpVRzhE9o16/7Zc8l3FEAcFz9X8+u4JWHQPp+46K1k8ylgHXME7f/o/KNjliPf0Db+/DJKQWeJJukGQaeqhOj53eHOrt58GNO+zoXt4f8I88XdwW73JoQIDAQAB"
+}

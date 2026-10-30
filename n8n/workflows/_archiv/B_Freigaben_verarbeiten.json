@@ -1,0 +1,314 @@
+{
+  "id": "jaFreigabenB0001",
+  "name": "Archiv · Freigaben verarbeiten (alt)",
+  "nodes": [
+    {
+      "id": "e7875607-90e8-4730-800b-930df4a1c268",
+      "name": "Notiz 4f638b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## B – Freigegebene Problemfälle verarbeiten\n**So gehst du vor:**\n1. In der Tabelle **jobs** bei Zeilen mit Status `wartet_auf_freigabe` in der Spalte **freigabe** `OK` eintragen.\n2. Falls ein Login nötig ist: http://localhost:3000 öffnen → Seite \"Im sichtbaren Browser öffnen\" → in **noVNC** (http://localhost:6080) **selbst** anmelden. Die Sitzung bleibt im Browser-Profil gespeichert.\n3. Diesen Workflow starten. Er verarbeitet **nur** Zeilen mit `freigabe = OK`.\n\nCaptchas werden nicht gelöst. Ist eine Seite auch mit Sitzung noch gesperrt, bleibt sie auf `wartet_auf_freigabe` (mit Hinweis).",
+        "width": 760,
+        "height": 360,
+        "color": 4
+      }
+    },
+    {
+      "id": "be3171ba-fa18-4ae1-afdc-83fe7c29ff16",
+      "name": "Notiz 34ada9",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        -330
+      ],
+      "parameters": {
+        "content": "## ⚙️ Hier einstellen\n- `testlimit`: wie viele Stellen pro Lauf (erst 10, dann mehr)\n- `max_alter_tage`: ältere Stellen → `zu_alt`\n- `pause_sekunden`: Pause zwischen zwei Stellen\n- `anbieter_override`: leer lassen = Einstellung aus \"00 KI-Aufruf\"; sonst `claude` oder `ollama`",
+        "width": 470,
+        "height": 230,
+        "color": 3
+      }
+    },
+    {
+      "id": "1fe5a2ee-28ba-45d9-bb09-b1777f14797d",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "2934a414-1035-4377-b5c0-94582e1a25dc",
+      "name": "⚙️ Testlauf & Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bd5c6b60-aba7-448d-adf3-1268d54dbc15",
+              "name": "testlimit",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "a4404ea9-d3ca-4d10-982c-37a42b78bdd9",
+              "name": "max_alter_tage",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "d273e901-75db-4f43-8324-7d2364ea5b7d",
+              "name": "pause_sekunden",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "f1e8b13d-822c-4063-95a0-55458b16d79a",
+              "name": "anbieter_override",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Einstellungen für diesen Lauf.",
+      "notesInFlow": true
+    },
+    {
+      "id": "74d08e2f-6e15-4f5b-ad3e-8fcfbf6bd0d7",
+      "name": "Wartende Zeilen holen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "wartet_auf_freigabe"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Alle Zeilen, die auf Freigabe warten.",
+      "notesInFlow": true
+    },
+    {
+      "id": "787ac5a9-2065-4ab9-9c72-8cc04a8ccda6",
+      "name": "Einstellungen anhängen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const e = $('⚙️ Testlauf & Einstellungen').first().json;\n// Nur Zeilen, bei denen du \"OK\" eingetragen hast (Groß-/Kleinschreibung egal).\nreturn $input\n  .all()\n  .filter((i) => String(i.json.freigabe || '').trim().toUpperCase() === 'OK')\n  .slice(0, e.testlimit)\n  .map((i) => ({ json: { ...i.json, mit_sitzung: true, max_alter_tage: e.max_alter_tage, anbieter_override: e.anbieter_override } }));"
+      },
+      "notes": "Gibt jeder Stelle die Einstellungen mit.",
+      "notesInFlow": true
+    },
+    {
+      "id": "d6433836-8348-4a89-ad0d-abf45d324786",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "33dfa757-8438-4268-8520-6914d75c56cb",
+      "name": "02 Stelle verarbeiten",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1220,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaStelleVerarb02"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Stufen 2–5 für diese eine Stelle.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f57c37ce-312a-40b4-8bc3-7301f6f69e4c",
+      "name": "Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        300
+      ],
+      "parameters": {
+        "amount": "={{ $('⚙️ Testlauf & Einstellungen').first().json.pause_sekunden }}",
+        "unit": "seconds"
+      },
+      "notes": "Kurze Pause – schont Webseiten und deine GPU.",
+      "notesInFlow": true,
+      "webhookId": "45978518-d927-4cc7-bce9-dff13d3f5150"
+    },
+    {
+      "id": "22fd9c28-6d44-4c53-a68a-582ca03c450b",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const zaehler = {};\nfor (const i of $input.all()) {\n  const s = i.json.status || (i.json.error ? 'fehler (Workflow)' : 'unbekannt');\n  zaehler[s] = (zaehler[s] || 0) + 1;\n}\nreturn [{ json: { verarbeitet: $input.all().length, nach_status: zaehler, naechster_schritt: 'Tabelle \"jobs\" ansehen, dann Workflow C (Bewertung) starten.' } }];"
+      },
+      "notes": "Wie viele Stellen in welchem Status gelandet sind.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Testlauf & Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Testlauf & Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Wartende Zeilen holen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wartende Zeilen holen": {
+      "main": [
+        [
+          {
+            "node": "Einstellungen anhängen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Einstellungen anhängen": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "02 Stelle verarbeiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Stelle verarbeiten": {
+      "main": [
+        [
+          {
+            "node": "Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "B – Freigegebene Problemfälle verarbeiten",
+  "tags": [],
+  "isArchived": true
+}

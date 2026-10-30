@@ -1,0 +1,391 @@
+{
+  "id": "jaSetupTabellen0",
+  "name": "9 Technik · Einrichtung (Tabellen anlegen, einmalig)",
+  "nodes": [
+    {
+      "id": "1d054437-4cc6-46e5-9556-79d4fb3bb80b",
+      "name": "Notiz 847b86",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -120
+      ],
+      "parameters": {
+        "content": "## 00 – Einrichtung (einmal ausführen)\nLegt die beiden Data Tables an:\n- **jobs** – die Ergebnistabelle mit allen Stellen\n- **vergleich** – Ergebnisse des Modellvergleichs (Workflow D)\n\nGibt es die Tabellen schon, passiert nichts (`createIfNotExists`).\nDie Tabellen findest du danach links unter **Overview → Data tables**.",
+        "width": 620,
+        "height": 260,
+        "color": 4
+      }
+    },
+    {
+      "id": "bcfec562-022d-4053-b948-589bdb371205",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "fd9d2c2f-c850-4632-8389-8c1cc12f5bf2",
+      "name": "Tabelle \"jobs\" anlegen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        200
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "jobs",
+        "columns": {
+          "column": [
+            {
+              "name": "url",
+              "type": "string"
+            },
+            {
+              "name": "domain",
+              "type": "string"
+            },
+            {
+              "name": "linktext",
+              "type": "string"
+            },
+            {
+              "name": "erstmals_gesehen",
+              "type": "string"
+            },
+            {
+              "name": "nicht_mehr_gelistet",
+              "type": "boolean"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "freigabe",
+              "type": "string"
+            },
+            {
+              "name": "hinweis",
+              "type": "string"
+            },
+            {
+              "name": "http_status",
+              "type": "number"
+            },
+            {
+              "name": "final_url",
+              "type": "string"
+            },
+            {
+              "name": "cache_id",
+              "type": "string"
+            },
+            {
+              "name": "screenshot",
+              "type": "string"
+            },
+            {
+              "name": "text_hash",
+              "type": "string"
+            },
+            {
+              "name": "dubletten_schluessel",
+              "type": "string"
+            },
+            {
+              "name": "duplikat_von",
+              "type": "string"
+            },
+            {
+              "name": "abgerufen_am",
+              "type": "string"
+            },
+            {
+              "name": "veroeffentlichungsdatum",
+              "type": "string"
+            },
+            {
+              "name": "alter_tage",
+              "type": "number"
+            },
+            {
+              "name": "jobtitel",
+              "type": "string"
+            },
+            {
+              "name": "firma",
+              "type": "string"
+            },
+            {
+              "name": "ort",
+              "type": "string"
+            },
+            {
+              "name": "remote",
+              "type": "string"
+            },
+            {
+              "name": "remote_regel_wortlaut",
+              "type": "string"
+            },
+            {
+              "name": "gehalt",
+              "type": "string"
+            },
+            {
+              "name": "vertragsform",
+              "type": "string"
+            },
+            {
+              "name": "bewerbungsweg",
+              "type": "string"
+            },
+            {
+              "name": "kurze_zusammenfassung",
+              "type": "string"
+            },
+            {
+              "name": "begruendung",
+              "type": "string"
+            },
+            {
+              "name": "modell_extraktion",
+              "type": "string"
+            },
+            {
+              "name": "passung_score",
+              "type": "number"
+            },
+            {
+              "name": "bewertung",
+              "type": "string"
+            },
+            {
+              "name": "bewertung_begruendung",
+              "type": "string"
+            },
+            {
+              "name": "pflichtkriterien_erfuellt",
+              "type": "string"
+            },
+            {
+              "name": "luecken",
+              "type": "string"
+            },
+            {
+              "name": "offene_fragen",
+              "type": "string"
+            },
+            {
+              "name": "warnsignale",
+              "type": "string"
+            },
+            {
+              "name": "modell_bewertung",
+              "type": "string"
+            },
+            {
+              "name": "bewertet_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Eine Zeile pro Stellenlink. Spalten siehe Anleitung.",
+      "notesInFlow": true
+    },
+    {
+      "id": "455bfd8c-dc44-4987-91ff-c97a6e846702",
+      "name": "Tabelle \"vergleich\" anlegen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        200
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "vergleich",
+        "columns": {
+          "column": [
+            {
+              "name": "url",
+              "type": "string"
+            },
+            {
+              "name": "cache_id",
+              "type": "string"
+            },
+            {
+              "name": "seitentyp_claude",
+              "type": "string"
+            },
+            {
+              "name": "seitentyp_ollama",
+              "type": "string"
+            },
+            {
+              "name": "status_claude",
+              "type": "string"
+            },
+            {
+              "name": "status_ollama",
+              "type": "string"
+            },
+            {
+              "name": "datum_claude",
+              "type": "string"
+            },
+            {
+              "name": "datum_ollama",
+              "type": "string"
+            },
+            {
+              "name": "jobtitel_claude",
+              "type": "string"
+            },
+            {
+              "name": "jobtitel_ollama",
+              "type": "string"
+            },
+            {
+              "name": "firma_claude",
+              "type": "string"
+            },
+            {
+              "name": "firma_ollama",
+              "type": "string"
+            },
+            {
+              "name": "remote_claude",
+              "type": "string"
+            },
+            {
+              "name": "remote_ollama",
+              "type": "string"
+            },
+            {
+              "name": "remote_regel_claude",
+              "type": "string"
+            },
+            {
+              "name": "remote_regel_ollama",
+              "type": "string"
+            },
+            {
+              "name": "gehalt_claude",
+              "type": "string"
+            },
+            {
+              "name": "gehalt_ollama",
+              "type": "string"
+            },
+            {
+              "name": "vertragsform_claude",
+              "type": "string"
+            },
+            {
+              "name": "vertragsform_ollama",
+              "type": "string"
+            },
+            {
+              "name": "zusammenfassung_claude",
+              "type": "string"
+            },
+            {
+              "name": "zusammenfassung_ollama",
+              "type": "string"
+            },
+            {
+              "name": "modell_claude",
+              "type": "string"
+            },
+            {
+              "name": "modell_ollama",
+              "type": "string"
+            },
+            {
+              "name": "dauer_claude_s",
+              "type": "number"
+            },
+            {
+              "name": "dauer_ollama_s",
+              "type": "number"
+            },
+            {
+              "name": "uebereinstimmung",
+              "type": "string"
+            },
+            {
+              "name": "unterschiede",
+              "type": "string"
+            },
+            {
+              "name": "fehler",
+              "type": "string"
+            },
+            {
+              "name": "verglichen_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Claude und Ollama nebeneinander.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"jobs\" anlegen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabelle \"jobs\" anlegen": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"vergleich\" anlegen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Legt die Data Tables jobs und vergleich an.",
+  "tags": [],
+  "isArchived": false
+}

@@ -1,0 +1,703 @@
+{
+  "id": "jaKIAufruf000001",
+  "name": "9 Technik · KI-Aufruf (alle Anbieter)",
+  "nodes": [
+    {
+      "id": "dfa6f886-0182-45e1-a27c-1d5e4ced7061",
+      "name": "Notiz e57d02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ],
+      "parameters": {
+        "content": "## KI-Aufruf mit Modell-Weiche\nDieser Workflow wird von den anderen Workflows aufgerufen (Stufe 4, Stufe 6, Cookie-Fallback, Vergleich).\n\n**Ablauf:** Einstellungen → Anfrage vorbereiten → **Switch** wählt Claude oder Ollama → Antwort in JSON umwandeln.\n\n**Was das Modell bekommt:**\n- `system` = Rolle und Regeln (aus der Prompt-Datei)\n- `anfrage` = die konkrete Aufgabe mit Seitentext\n- `schema` = das feste JSON-Format der Antwort\n\nBeide Modelle werden gezwungen, genau dieses JSON zu liefern (\"structured output\"). So gibt es keine Plauderei, nur Daten.",
+        "width": 700,
+        "height": 330,
+        "color": 4
+      }
+    },
+    {
+      "id": "42a27615-2379-4389-b0cd-8dd552f3fae1",
+      "name": "Notiz f23432",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -260
+      ],
+      "parameters": {
+        "content": "## ⚙️ HIER Modell einstellen\n- `anbieter_standard`: **ollama** oder **claude**\n- `claude_modell`: z. B. claude-haiku-5-5 (günstig, schnell), claude-sonnet-5-5, claude-opus-5-5\n- `claude_effort`: low / medium / high – wie gründlich Claude nachdenkt (mehr = teurer)\n- `ollama_modell`: z. B. qwen3:8b oder mistral:7b (vorher mit `ollama pull` laden)\n- `ollama_denken`: **aus** für qwen3 (schneller); **standard** für Modelle ohne Denk-Modus (z. B. mistral)\n\n⚠️ Nach jeder Änderung hier oben rechts **Publish** klicken – die anderen Workflows benutzen die veröffentlichte Version.\n- `max_woerter_*`: wie viel Seitentext das Modell höchstens bekommt (qwen: 3500 Wörter ≈ 5000 Tokens – mehr passt nicht ins Textfenster der GPU).\n\nWorkflows können die Einstellung pro Lauf mit `anbieter_override` überschreiben (z. B. der Vergleich).",
+        "width": 560,
+        "height": 330,
+        "color": 3
+      }
+    },
+    {
+      "id": "ba9d903e-b7d6-4365-9356-1111b1a5bf2c",
+      "name": "Wenn von anderem Workflow aufgerufen",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Startpunkt, wenn ein anderer Workflow diesen aufruft. Nimmt alle Daten unverändert an.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b8030d64-e211-4ec6-a3d1-423b5f0761a9",
+      "name": "⚙️ Modell-Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "62c37095-5e43-4c24-8c4a-d8f3a64917f5",
+              "name": "anbieter_standard",
+              "value": "claude",
+              "type": "string"
+            },
+            {
+              "id": "e72d2543-2946-47ce-b474-ee882f8d767f",
+              "name": "claude_modell",
+              "value": "claude-haiku-5-5",
+              "type": "string"
+            },
+            {
+              "id": "de24e424-1524-47d1-8a32-e67637d6a6dd",
+              "name": "claude_effort",
+              "value": "low",
+              "type": "string"
+            },
+            {
+              "id": "fbe8f2be-f743-430f-915b-f252850033a0",
+              "name": "ollama_modell",
+              "value": "qwen3:8b",
+              "type": "string"
+            },
+            {
+              "id": "91e7f953-b31e-43ff-a13d-d118c6f928d6",
+              "name": "ollama_url",
+              "value": "http://host.docker.internal:11434",
+              "type": "string"
+            },
+            {
+              "id": "eb1bd8ee-7af7-4eba-96c3-922703451a76",
+              "name": "ollama_denken",
+              "value": "aus",
+              "type": "string"
+            },
+            {
+              "id": "d26ec6a4-1175-44c1-977c-a8b0267f9b8b",
+              "name": "ollama_kontext",
+              "value": 16384,
+              "type": "number"
+            },
+            {
+              "id": "b749f145-4fad-4643-b772-cc06596697c2",
+              "name": "max_woerter_ollama",
+              "value": 3500,
+              "type": "number"
+            },
+            {
+              "id": "c62c8d61-d30b-462e-97ba-fb1e4162c7ee",
+              "name": "max_woerter_claude",
+              "value": 5000,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "Zentrale Modell-Einstellung für ALLE Workflows.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b512c89d-e153-4d6a-ab47-f69c05dde01f",
+      "name": "KI-Schalter lesen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        380
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/einstellungen",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Liest den Schalter „🖥 lokal / ☁️ Claude“ von der Ergebnis-Seite.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b4b13be4-331b-45e1-8ab0-2c2a2317be8a",
+      "name": "Anfrage vorbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Welches Modell soll antworten? Ein \"anbieter_override\" aus dem\n// aufrufenden Workflow hat Vorrang vor der Standard-Einstellung.\nconst e = $('⚙️ Modell-Einstellungen').first().json;\n// Reihenfolge: 1. Vorgabe des aufrufenden Workflows, 2. Schalter auf der Ergebnis-Seite\n// (\"lokal\" / \"claude\"), 3. anbieter_standard hier im Einstellungs-Knoten.\nconst schalter = $json.ki_ort === 'claude' ? 'claude' : $json.ki_ort === 'lokal' ? 'ollama' : '';\n// 0. Höchste Priorität: Modell-Auswahl pro Funktion aus \"⚙️ Einstellungen\" (Profil)\n// Neue Funktionen ohne gespeicherte Auswahl erben von einer verwandten (statt auf lokal zu fallen)\nconst ERBT_VON = { einordnung: 'fakten' };\nconst wahl = ($json.modelle || {})[e.funktion] || ($json.modelle || {})[ERBT_VON[e.funktion]] || null;\nconst wahlAnbieter = wahl && wahl.anbieter ? (wahl.anbieter === 'lokal' ? 'ollama' : wahl.anbieter) : '';\nconst anbieter = String(wahlAnbieter || e.anbieter_override || schalter || e.anbieter_standard || 'claude').toLowerCase().trim();\n\n// Modelle haben ein begrenztes \"Kontextfenster\" (wie viel Text sie auf einmal\n// lesen können). Deshalb kürzen wir den Seitentext auf höchstens N Wörter.\nconst maxWoerter = Number(anbieter === 'ollama' ? e.max_woerter_ollama : e.max_woerter_claude) || 2000;\nconst text = String(e.seitentext || '');\nlet ende = text.length;\nlet gezaehlt = 0;\nconst wort = /\\S+/g;\nlet m;\nwhile ((m = wort.exec(text)) !== null) {\n  gezaehlt++;\n  if (gezaehlt === maxWoerter) {\n    ende = m.index + m[0].length;\n    break;\n  }\n}\nconst gekuerzt = ende < text.length;\nconst eingefuegt = text.slice(0, ende) + (gekuerzt ? '\\n[... Text nach ' + maxWoerter + ' Wörtern gekürzt ...]' : '');\nconst voll = String(e.anfrage || '').replace('{{SEITENTEXT}}', () => eingefuegt);\n// Prompt Caching (nur Claude): Alles VOR der Zeile <<<CACHE>>> ist bei jeder Stelle gleich\n// (Anweisung, Such-Prompt, Lebenslauf). Claude merkt sich diesen Anfang ca. 5 Minuten –\n// jede weitere Stelle zahlt dafür nur ~10 %. Andere Anbieter bekommen den Text ohne Marke.\nconst MARKE = /\\n?<<<CACHE>>>\\n?/;\nconst teile = voll.split(MARKE);\nconst anfrage_fest = teile.length > 1 ? teile[0] + '\\n\\n' : '';\nconst anfrage_rest = teile.length > 1 ? teile.slice(1).join('\\n') : voll;\nconst anfrage = anfrage_fest + anfrage_rest;\n\nreturn {\n  json: {\n    anbieter,\n    // Ein aufrufender Workflow kann auch Modell und effort vorgeben (z. B. C: Sonnet).\n    // \"claude_modell_zwang\" (vom aufrufenden Workflow pro Stelle) schlägt alles – nur wenn ohnehin Claude antwortet\n    modell: e.claude_modell_zwang && anbieter === 'claude' ? e.claude_modell_zwang :\n      wahl && wahl.modell && wahlAnbieter === anbieter\n        ? wahl.modell\n        : anbieter === 'claude'\n          ? e.claude_modell_override || e.claude_modell\n          : anbieter === 'ollama'\n            ? e.ollama_modell_override || e.ollama_modell\n            : (wahl && wahl.modell) || '',\n    funktion: e.funktion || '',\n    system: e.system,\n    anfrage,\n    anfrage_fest,\n    anfrage_rest,\n    schema: e.schema,\n    claude_effort: e.claude_effort_override || e.claude_effort,\n    ollama_url: e.ollama_url,\n    ollama_kontext: e.ollama_kontext,\n    ollama_denken: e.ollama_denken_override || e.ollama_denken,\n    gekuerzt,\n    start_ms: Date.now(),\n    kontext: e.kontext || {},\n  },\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "notes": "Wählt das Modell und kürzt den Seitentext passend.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b3f9ace9-588b-4ed3-a684-66da7f22b75a",
+      "name": "Welches Modell?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        780,
+        200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "681adf2a-e3ad-4f4f-bc20-41ced9d54c6c",
+                    "leftValue": "={{ $json.anbieter }}",
+                    "rightValue": "claude",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Claude"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "36a7f100-d8d3-455c-ae11-b04334cfa5fe",
+                    "leftValue": "={{ $json.anbieter }}",
+                    "rightValue": "ollama",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ollama"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9209e51a-c40e-43e5-aef5-d767e7999b54",
+                    "leftValue": "={{ $json.anbieter }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "OpenAI"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "08c2dd8f-9b34-4e87-8943-36e73bc32cfd",
+                    "leftValue": "={{ $json.anbieter }}",
+                    "rightValue": "gemini",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Gemini"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b238cb87-5fee-4837-b13e-a131d6050c7d",
+                    "leftValue": "={{ $json.anbieter }}",
+                    "rightValue": "mistral",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mistral"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Die Weiche: je nach Anbieter (Einstellungen) zu Claude, Ollama, OpenAI, Gemini oder Mistral.",
+      "notesInFlow": true
+    },
+    {
+      "id": "4190c504-ae8d-4674-8295-bd1efa133c94",
+      "name": "KI: OpenAI (GPT)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "options": {
+          "timeout": 180000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.modell, messages: [{ role: 'system', content: $json.system }, { role: 'user', content: $json.anfrage }], response_format: { type: 'json_schema', json_schema: { name: 'antwort', strict: true, schema: $json.schema } } }) }}"
+      },
+      "notes": "Ruft GPT über die OpenAI-API auf. Schlüssel: n8n → Credentials → \"OpenAI API Key\".",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "openAiApi": {
+          "id": "jaOpenAIKey00001",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "id": "f495fd0f-0608-479a-b15f-ac48c9710b91",
+      "name": "KI: Gemini (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $json.modell }}:generateContent",
+        "options": {
+          "timeout": 180000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ systemInstruction: { parts: [{ text: $json.system }] }, contents: [{ role: 'user', parts: [{ text: $json.anfrage }] }], generationConfig: { responseMimeType: 'application/json', responseJsonSchema: $json.schema } }) }}"
+      },
+      "notes": "Ruft Gemini über die Google-API auf. Schlüssel: n8n → Credentials → \"Gemini API Key\".",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jaGeminiKey00001",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "id": "d67115a9-888e-4d44-96d3-09dac4fbeee5",
+      "name": "KI: Mistral",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        740
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/chat/completions",
+        "options": {
+          "timeout": 180000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mistralCloudApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.modell, messages: [{ role: 'system', content: $json.system }, { role: 'user', content: $json.anfrage }], response_format: { type: 'json_schema', json_schema: { name: 'antwort', strict: true, schema: $json.schema } } }) }}"
+      },
+      "notes": "Ruft Mistral auf. Schlüssel: n8n → Credentials → \"Mistral API Key\".",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "jaMistralKey0001",
+          "name": "Mistral API Key"
+        }
+      }
+    },
+    {
+      "id": "7d9e0b95-636c-4280-9457-25e91a6a5c9d",
+      "name": "KI: Claude (Anthropic API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "options": {
+          "timeout": 180000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.modell, max_tokens: 8000, system: $json.system, messages: [{ role: 'user', content: $json.anfrage_fest ? [{ type: 'text', text: $json.anfrage_fest, cache_control: { type: 'ephemeral' } }, { type: 'text', text: $json.anfrage_rest }] : $json.anfrage }], output_config: { effort: $json.claude_effort, format: { type: 'json_schema', schema: $json.schema } } }) }}"
+      },
+      "notes": "Ruft Claude über die Anthropic-API auf. Der API-Key steckt im Zugang \"Anthropic API Key\". Gleicher Anfang (vor <<<CACHE>>>) wird zwischengespeichert = billiger.",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jaAnthropicKey01",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "id": "2df45c9c-3708-465f-878c-80ec71d53571",
+      "name": "KI: Ollama (lokal)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.ollama_url }}/api/chat",
+        "options": {
+          "timeout": 600000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({ model: $json.modell, stream: false, format: $json.schema, options: { temperature: 0, num_ctx: $json.ollama_kontext, num_predict: 6000 }, messages: [{ role: 'system', content: $json.system }, { role: 'user', content: $json.anfrage }] }, $json.ollama_denken === 'aus' ? { think: false } : $json.ollama_denken === 'an' ? { think: true } : {})) }}"
+      },
+      "notes": "Ruft das lokale Modell in Ollama auf (läuft unter Windows auf deiner GPU).",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "424c2614-3eb3-48f8-b6fa-6e52b97560d0",
+      "name": "Antwort in JSON umwandeln",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Beide Modelle antworten in einem anderen \"Umschlag\":\n//   Claude:  { content: [ { type: 'text', text: '{...}' } ], stop_reason, usage }\n//   Ollama:  { message: { content: '{...}' }, eval_count, ... }\n// Hier holen wir den JSON-Text heraus und wandeln ihn in ein Objekt um.\nconst req = $('Anfrage vorbereiten').first().json;\nconst r = $json;\nconst dauer_s = Math.round((Date.now() - req.start_ms) / 100) / 10;\nlet roh = '';\nlet fehler = '';\n\nif (r.error) {\n  fehler = typeof r.error === 'string' ? r.error : r.error.message || JSON.stringify(r.error);\n} else if (req.anbieter === 'claude') {\n  if (r.stop_reason === 'refusal') fehler = 'Claude hat die Anfrage abgelehnt (refusal).';\n  if (r.stop_reason === 'max_tokens') fehler = 'Antwort wurde abgeschnitten (max_tokens zu klein).';\n  const block = (r.content || []).find((b) => b.type === 'text');\n  roh = block ? block.text : '';\n} else if (req.anbieter === 'openai' || req.anbieter === 'mistral') {\n  //   OpenAI/Mistral: { choices: [ { message: { content: '{...}' }, finish_reason } ], usage }\n  const c = (r.choices || [])[0] || {};\n  const msg = c.message || {};\n  if (msg.refusal) fehler = 'Modell hat die Anfrage abgelehnt: ' + msg.refusal;\n  if (c.finish_reason === 'length') fehler = 'Antwort wurde abgeschnitten (zu lang).';\n  roh = Array.isArray(msg.content) ? msg.content.map((t) => t.text || '').join('') : String(msg.content || '');\n} else if (req.anbieter === 'gemini') {\n  //   Gemini: { candidates: [ { content: { parts: [ { text: '{...}' } ] }, finishReason } ], usageMetadata }\n  const c = (r.candidates || [])[0] || {};\n  if (c.finishReason === 'MAX_TOKENS') fehler = 'Antwort wurde abgeschnitten (zu lang).';\n  if (!c.content && r.promptFeedback && r.promptFeedback.blockReason) fehler = 'Gemini hat die Anfrage blockiert: ' + r.promptFeedback.blockReason;\n  roh = ((c.content || {}).parts || []).map((p) => p.text || '').join('');\n} else {\n  roh = (r.message && r.message.content) || '';\n}\n\nlet daten = null;\nif (!fehler) {\n  try {\n    const sauber = roh\n      .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n      .replace(/^\\s*```(json)?/, '')\n      .replace(/```\\s*$/, '')\n      .trim();\n    daten = JSON.parse(sauber);\n  } catch (e) {\n    fehler = 'Antwort war kein gültiges JSON: ' + roh.slice(0, 300);\n  }\n}\n\n// Probleme, bei denen jede weitere Anfrage auch scheitert → Seite meldet es, Lauf hält an\nlet problem = '';\nconst NAME = { claude: 'Claude', openai: 'OpenAI', gemini: 'Gemini', mistral: 'Mistral' }[req.anbieter] || req.anbieter;\nif (/credit balance|purchase credits|billing|insufficient_quota|exceeded your current quota/i.test(fehler)) {\n  problem = 'guthaben';\n  fehler = `${NAME}-Guthaben ist leer – beim Anbieter nachladen. (` + fehler.slice(0, 200) + ')';\n} else if (/authentication_error|invalid x-api-key|invalid_api_key|API_KEY_INVALID|API key not valid|Unauthorized|Authorization failed|\\b401\\b/i.test(fehler)) {\n  problem = 'schluessel';\n  fehler = `${NAME}: API-Schlüssel ungültig – in n8n → Credentials prüfen. (` + fehler.slice(0, 200) + ')';\n}\n\nreturn {\n  json: {\n    ok: !fehler && daten !== null,\n    daten,\n    fehler,\n    problem,\n    anbieter: req.anbieter,\n    modell: req.modell,\n    dauer_s,\n    gekuerzt: req.gekuerzt,\n    verbrauch: r.usage || r.usageMetadata || (r.eval_count ? { eingabe_tokens: r.prompt_eval_count, ausgabe_tokens: r.eval_count } : null),\n    kontext: req.kontext,\n  },\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "notes": "Ergebnis: { ok, daten, fehler, problem, modell, dauer_s }.",
+      "notesInFlow": true
+    },
+    {
+      "id": "46b5ba67-ba93-4cd4-8e1e-08f0c159edfa",
+      "name": "KI-Problem an Seite melden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/ki-status",
+        "options": {
+          "timeout": 5000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ art: $json.problem || \"\", anbieter: $json.anbieter || \"\", fehler: $json.problem ? $json.fehler : \"\" }) }}"
+      },
+      "notes": "Guthaben leer / Schlüssel ungültig → Ergebnis-Seite zeigt Warnung, Läufe halten an. Sonst passiert nichts.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a3f3fdb6-e034-40d3-9c15-a02311e3407a",
+      "name": "Ergebnis zurückgeben",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        200
+      ],
+      "parameters": {
+        "jsCode": "return { json: $('Antwort in JSON umwandeln').item.json };",
+        "mode": "runOnceForEachItem"
+      },
+      "notes": "Das geht zurück an den aufrufenden Workflow.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Wenn von anderem Workflow aufgerufen": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Modell-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Modell-Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "KI-Schalter lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI-Schalter lesen": {
+      "main": [
+        [
+          {
+            "node": "Anfrage vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anfrage vorbereiten": {
+      "main": [
+        [
+          {
+            "node": "Welches Modell?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Welches Modell?": {
+      "main": [
+        [
+          {
+            "node": "KI: Claude (Anthropic API)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KI: Ollama (lokal)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KI: OpenAI (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KI: Gemini (Google)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KI: Mistral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Claude (Anthropic API)": {
+      "main": [
+        [
+          {
+            "node": "Antwort in JSON umwandeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Ollama (lokal)": {
+      "main": [
+        [
+          {
+            "node": "Antwort in JSON umwandeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: OpenAI (GPT)": {
+      "main": [
+        [
+          {
+            "node": "Antwort in JSON umwandeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Gemini (Google)": {
+      "main": [
+        [
+          {
+            "node": "Antwort in JSON umwandeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Mistral": {
+      "main": [
+        [
+          {
+            "node": "Antwort in JSON umwandeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Antwort in JSON umwandeln": {
+      "main": [
+        [
+          {
+            "node": "KI-Problem an Seite melden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI-Problem an Seite melden": {
+      "main": [
+        [
+          {
+            "node": "Ergebnis zurückgeben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Sub-Workflow: schickt eine Anfrage an Claude oder Ollama und liefert JSON zurück.",
+  "tags": [],
+  "isArchived": false
+}

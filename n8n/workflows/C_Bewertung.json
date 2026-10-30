@@ -1,0 +1,1009 @@
+{
+  "id": "jaBewertungC0001",
+  "name": "1 Sammeln · Schritt 4 · KI bewertet",
+  "nodes": [
+    {
+      "id": "3a3b31d2-032b-44a3-8dc5-225b291823f3",
+      "name": "Notiz af55de",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -360
+      ],
+      "parameters": {
+        "content": "## C – Bewertung nach deinen Kriterien (Stufe 6)\nArbeitet **nur** auf gespeicherten Daten (Fakten in der Tabelle + Seitentext im Cache). Es wird **keine** Seite neu abgerufen.\n\n1. Kriterien im gelben Knoten **📝 Meine Kriterien** ändern.\n2. Starten. Standard: nur Stellen **ohne** Bewertung.\n3. Nach einer Kriterien-Änderung: `alle_neu_bewerten = true`.\n\nErgebnis pro Stelle: `passung_score` 1–5 und `bewertung` (passt gut / passt teilweise / passt nicht) + Begründung, Lücken, offene Fragen, Warnsignale.\nIn der Tabelle nach `passung_score` absteigend sortieren.",
+        "width": 760,
+        "height": 380,
+        "color": 4
+      }
+    },
+    {
+      "id": "238fac7e-b713-4432-ae16-63974b7f2758",
+      "name": "Notiz 332bc5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        -360
+      ],
+      "parameters": {
+        "content": "## 📝 Deine Kriterien\nKriterien, Ausschlussliste, Signalwörter und Lebenslauf bearbeitest du jetzt auf der Seite **⚙️ Einstellungen** (http://localhost:3000/neu#einstellungen). Der Knoten **📝 Standard-Kriterien** enthält nur noch Ersatzwerte für leere Felder.\n\n`bereits_bearbeitet`: Firmen mit Komma getrennt → automatisch „passt nicht\".\n\n**Hybrid:**\n1. Erste Bewertung – je nach **Schalter auf der Ergebnis-Seite**: 🖥 lokal (qwen3, kostenlos, GPU) oder ☁️ Claude Haiku (ca. 0,2 ct pro Stelle).\n2. Danach (`zweitmeinung_automatisch = true`) bewertet **C2** alle mit Score ≥ `zweitmeinung_ab_score` noch einmal mit `zweitmeinung_modell` (Sonnet 5.5), höchstens `zweitmeinung_max_stellen` (100 ≈ 2–3 $).\n\nNur die Claude-Runde: `nur_zweitmeinung = true`.\nKosten sparen: `zweitmeinung_automatisch = false`.",
+        "width": 520,
+        "height": 420,
+        "color": 3
+      }
+    },
+    {
+      "id": "a2949b7a-ce17-4dd1-860d-d76d2b9110d4",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c8a78e70-c7b3-4db4-ab35-005003d20755",
+      "name": "Profil laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        380
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/profil",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Kriterien, Listen, Lebenslauf aus der Seite ⚙️ Einstellungen.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "586c9fb4-510c-4c01-aa9f-2c7133b246b5",
+      "name": "📝 Meine Kriterien",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        380
+      ],
+      "parameters": {
+        "jsCode": "// Was du auf der Seite \"⚙️ Einstellungen\" eingetragen hast, hat Vorrang.\n// Leere Felder → Standardwerte aus dem Knoten \"📝 Standard-Kriterien\".\nconst s = $('📝 Standard-Kriterien').first().json;\nconst p = $json && $json.ok ? $json : {};\nconst zm = p.modelle && p.modelle.zweitmeinung && p.modelle.zweitmeinung.modell;\nreturn [\n  {\n    json: {\n      ...s,\n      kriterien: p.kriterien || s.kriterien,\n      bereits_bearbeitet: p.bereits_bearbeitet || s.bereits_bearbeitet,\n      signal_plus: p.signal_plus || s.signal_plus,\n      signal_minus: p.signal_minus || s.signal_minus,\n      zweitmeinung_modell: zm || s.zweitmeinung_modell,\n      lebenslauf_text: p.lebenslauf_text || '',\n    },\n  },\n];"
+      },
+      "notes": "Profil von der Einstellungs-Seite + Standardwerte.",
+      "notesInFlow": true
+    },
+    {
+      "id": "25bdf6a6-5d31-4f6f-a494-81da74713ba0",
+      "name": "📝 Standard-Kriterien",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1ae3acb-75c6-4a6c-88d0-11ae1fdd975b",
+              "name": "kriterien",
+              "value": "# Profil und Kriterien: Remote-Jobs (Beispielprofil)\n\n## Wer ich bin\n- Büro- und Projektassistenz, 4 Jahre Erfahrung: Excel, CRM-Systeme, Terminplanung, Kundenkommunikation auf Deutsch und Englisch\n- Sicher im Umgang mit Office-Anwendungen und einfachen Datenauswertungen\n- Ausbildung im kaufmännischen Bereich\n\n## Pflichtkriterien\n1. 100 % remote, Arbeitsort innerhalb Deutschlands oder der EU\n2. Mindestens 2.500 € brutto im Monat bzw. ein Stundensatz, der das in Teilzeit oder Vollzeit erreicht\n3. Festanstellung oder Freelance mit festem Auftragsvolumen. Reine Provision nur als Nebenoption\n\n## Rollen nach Priorität\n1. Projektassistenz, Backoffice, Office-Management\n2. Kundenservice oder Support per Mail und Chat\n3. Terminkoordination und Verwaltung\n\n## Ausschluss\n- Präsenzpflicht, Schichtarbeit, Außendienst\n- Reine Kaltakquise",
+              "type": "string"
+            },
+            {
+              "id": "a7e9223c-3502-428f-a3c2-787dbcf7c5e2",
+              "name": "bereits_bearbeitet",
+              "value": "netshake, functn, plehn media, Spross Consulting, Coldcallingcrew, TutorSpace, HeroSoftware, Clearview, Ketteler & Funcken, TRETMANN, Glasfaser für Unternehmen, klaude.tech, LoveFixed, Powerprozesse, tante-e, SiPRi, The Happy Customers, nutri+, Dierkes Partner, Starline Progression Partners",
+              "type": "string"
+            },
+            {
+              "id": "55237484-1a12-43fb-8883-c3dfd76d2986",
+              "name": "signal_plus",
+              "value": "work from anywhere, work from everywhere, remote worldwide, worldwide, anywhere in the world, fully remote, fully distributed, distributed team, remote-first, remote first, no office, kein büro, ohne büro, hire globally, hiring globally, location independent, ortsunabhängig, digital nomad, async, asynchronous, deel, remote.com, oyster, contractor, freelance, emea",
+              "type": "string"
+            },
+            {
+              "id": "0f89f483-4697-4e8d-8fc9-f63a9b582d81",
+              "name": "signal_minus",
+              "value": "germany only, only in germany, nur deutschland, nur in deutschland, wohnsitz in deutschland, based in germany, must be based, must reside, must live, residing in, eu only, europe only, dach only, within the eu, innerhalb der eu, innerhalb deutschlands, eu work permit, work permit, arbeitserlaubnis, hybrid, office days, präsenztage, vor ort, on-site, onsite, im büro",
+              "type": "string"
+            },
+            {
+              "id": "a0a2751c-1524-4ca3-a3aa-5dcfd91f0c48",
+              "name": "alle_neu_bewerten",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d0e1a567-7bb2-4f77-89a8-e1e89490022e",
+              "name": "testlimit",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "6dbab842-c622-4204-86b0-769492b881eb",
+              "name": "anbieter_override",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f90f8fe6-ab25-4f61-95c3-22768ec7e99d",
+              "name": "ollama_denken_override",
+              "value": "an",
+              "type": "string"
+            },
+            {
+              "id": "84ab17d1-f273-49d9-a2fa-53afdd40a15b",
+              "name": "claude_effort_override",
+              "value": "medium",
+              "type": "string"
+            },
+            {
+              "id": "15d988fe-7b24-43c8-928a-ec4e79187fc8",
+              "name": "zweitmeinung_automatisch",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "fb90eae4-414d-4e44-a664-18d8bb96fe4d",
+              "name": "zweitmeinung_ab_score",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "d082837b-f40b-4afb-a97a-3c6b45e9c386",
+              "name": "zweitmeinung_max_stellen",
+              "value": 100,
+              "type": "number"
+            },
+            {
+              "id": "01110827-1905-4496-8ae9-ecd6e79aa60c",
+              "name": "zweitmeinung_anbieter",
+              "value": "claude",
+              "type": "string"
+            },
+            {
+              "id": "07f6bd84-d47e-4e4c-aa9f-d319ce4cbe5c",
+              "name": "zweitmeinung_modell",
+              "value": "claude-sonnet-5-5",
+              "type": "string"
+            },
+            {
+              "id": "9204f5a4-f7b5-4de6-bac1-8c5c058f533d",
+              "name": "nur_zweitmeinung",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "HIER deine Kriterien eintragen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "4a0d6a8a-5a18-460f-b71a-ff991ae51009",
+      "name": "Aktive Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "aktiv"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "unklar"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Alle Stellen mit Status aktiv oder unklar.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a795c26e-7fb6-4270-9fb9-4ddbf8779855",
+      "name": "Auswahl & Ausschlussliste",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const k = $('📝 Meine Kriterien').first().json;\nconst liste = String(k.bereits_bearbeitet || '')\n  .split(',')\n  .map((s) => s.trim().toLowerCase())\n  .filter(Boolean);\n\n// Von A2 gestartet (Nachtlauf)? Dann ALLE offenen Stellen, sonst nur \"testlimit\".\nconst vonA2 = $('Start per Kette').isExecuted;\nconst limit = vonA2 ? Number.MAX_SAFE_INTEGER : Number(k.testlimit);\n// Gezielt neu bewerten: Kette mit { ids: [...] } gestartet → genau diese Stellen, auch wenn schon bewertet\nconst nurIds = vonA2 && Array.isArray((($('Start per Kette').first().json || {}).body || {}).ids) ? $('Start per Kette').first().json.body.ids.map(Number) : null;\n\nconst aus = [];\nlet zuKI = 0;\nfor (const i of $input.all()) {\n  const r = i.json;\n  if (!r.id) continue;\n  if (nurIds) { if (!nurIds.includes(Number(r.id))) continue; }\n  else if (!k.alle_neu_bewerten && r.bewertung && r.bewertung !== 'fehler') continue; // schon bewertet (Fehler → nochmal versuchen)\n  const firma = String(r.firma || '').toLowerCase();\n  const treffer = liste.find((f) => firma && (firma.includes(f) || f.includes(firma)));\n  if (treffer) {\n    // Steht auf der Liste \"bereits bearbeitet\" → ohne KI direkt \"passt nicht\"\n    aus.push({ json: { ...r, _direkt: true, _grund: `Firma steht auf der Liste \"Bereits bearbeitet\" (${treffer}).` } });\n    continue;\n  }\n  if (zuKI >= limit) continue;\n  zuKI++;\n  aus.push({ json: { ...r, _direkt: false } });\n}\n// Nichts zu tun? Ein Markierungs-Element, damit der Ablauf trotzdem weitergeht.\nreturn aus.length ? aus : [{ json: { _leer: true } }];"
+      },
+      "notes": "Wählt aus, was bewertet wird. Ausschlussliste ohne KI.",
+      "notesInFlow": true
+    },
+    {
+      "id": "93b978e3-9c67-4bb7-aeb1-d4ecfb1fea88",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "0e9f2c41-fc15-4858-ade9-4d512c6aa70a",
+      "name": "Schon entschieden?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "afbe4d78-f3d5-4b83-b069-1045008bf12c",
+              "leftValue": "={{ $json._direkt === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = Firma auf Ausschlussliste.",
+      "notesInFlow": true
+    },
+    {
+      "id": "82a7d0bb-ff46-420f-b067-47d33490b55f",
+      "name": "Seitentext aus Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        420
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Gespeicherter Text – kein neuer Abruf der Webseite.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "043d5cea-366e-4aad-ba18-bde9a1beba1c",
+      "name": "Bewertungs-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        420
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/bewertung.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/bewertung.md",
+      "notesInFlow": true
+    },
+    {
+      "id": "dc5523a1-3b78-4fb6-87a4-6508b0d29af5",
+      "name": "Bewertungs-Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        420
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: eine Stelle nach der anderen').first().json;\nconst cache = $('Seitentext aus Cache').first().json;\nconst k = $('📝 Meine Kriterien').first().json;\n\nconst vorlage = String($json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, key) => (key in werte ? werte[key] : m));\n\nconst fakten = [\n  `Jobtitel: ${row.jobtitel || '-'}`,\n  `Firma: ${row.firma || '-'}`,\n  `Ort: ${row.ort || '-'}`,\n  `Remote: ${row.remote || '-'}`,\n  `Remote-Regel (wörtlich): ${row.remote_regel_wortlaut || '-'}`,\n  `Gehalt: ${row.gehalt || '-'}`,\n  `Vertragsform: ${row.vertragsform || '-'}`,\n  `Bewerbungsweg: ${row.bewerbungsweg || '-'}`,\n  `Veröffentlicht: ${row.veroeffentlichungsdatum || 'unbekannt'}`,\n  `Zusammenfassung: ${row.kurze_zusammenfassung || '-'}`,\n].join('\\n');\n\n// ---- Signalwort-Check per Code (findet zuverlässig, erfindet nichts) ----\nconst seitentext = cache && cache.ok ? String(cache.text) : '';\nconst suchtext = (seitentext + '\\n' + (row.remote_regel_wortlaut || '')).toLowerCase();\nconst finde = (liste) =>\n  String(liste || '')\n    .split(',')\n    .map((w) => w.trim().toLowerCase())\n    .filter((w) => w && suchtext.includes(w));\nconst plus = finde(k.signal_plus);\nconst minus = finde(k.signal_minus);\nconst signale =\n  `Automatisch im Anzeigentext gefundene Signalwörter zum Arbeitsort:\\n` +\n  `- Plus: ${plus.length ? plus.join(', ') : 'keine'}\\n` +\n  `- Minus: ${minus.length ? minus.join(', ') : 'keine'}\\n` +\n  `(Prüfe im Text, in welchem Zusammenhang sie stehen – z. B. kann \"hybrid\" auch \"nicht hybrid\" heißen.)`;\n\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['passung_score', 'pflichtkriterien_erfuellt', 'begruendung', 'luecken', 'offene_fragen', 'warnsignale', 'dev_skills_nutzen', 'dev_skills_wie'],\n  properties: {\n    dev_skills_nutzen: { type: 'string', enum: ['hoch', 'mittel', 'gering', 'keiner'] },\n    dev_skills_wie: { type: 'string', description: 'Welche Entwickler-Skills konkret wofür helfen' },\n    passung_score: { type: 'integer', description: '1 (passt nicht) bis 5 (passt sehr gut)' },\n    pflichtkriterien_erfuellt: { type: 'string', enum: ['ja', 'nein', 'unklar'] },\n    begruendung: { type: 'string' },\n    luecken: { type: 'string' },\n    offene_fragen: { type: 'string' },\n    warnsignale: { type: 'string' },\n  },\n};\n\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, { HEUTE: $now.toFormat('yyyy-MM-dd'), KRITERIEN: k.kriterien, FAKTEN: fakten + '\\n\\n' + signale, URL: row.url, SEITENTEXT: '{{SEITENTEXT}}' }),\n      seitentext: seitentext || '(kein Seitentext im Cache – nur Fakten verwenden)',\n      schema: SCHEMA,\n      anbieter_override: k.anbieter_override || '',\n      funktion: k.funktion_override || 'bewertung', // Modell laut Einstellungen\n      claude_modell_override: k.claude_modell_override || '',\n      claude_effort_override: k.claude_effort_override || '',\n      ollama_denken_override: k.ollama_denken_override || '',\n      kontext: {\n        id: row.id,\n        signale_plus: plus.join(', '),\n        signale_minus: minus.join(', '),\n        vorher_score: row.passung_score || null,\n        vorher_modell: row.modell_bewertung || '',\n      },\n    },\n  },\n];"
+      },
+      "notes": "Kriterien + Fakten + Seitentext + JSON-Schema.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b193c2e6-5980-4365-ae8f-f9b48c293bf2",
+      "name": "Stufe 6: KI-Bewertung",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        420
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b92d2b09-c9c5-4632-b8cb-c6f5b863fa69",
+      "name": "Bewertung aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nconst jetzt = new Date().toISOString();\nif (r._direkt) {\n  return [{ json: { id: r.id, passung_score: 1, bewertung: 'passt nicht', bewertung_begruendung: r._grund, pflichtkriterien_erfuellt: '', luecken: '', offene_fragen: '', warnsignale: '', modell_bewertung: 'regel', bewertet_am: jetzt } }];\n}\nconst modell = `${r.anbieter || '?'}:${r.modell || '?'}`;\nif (!r.ok && r.kontext && r.kontext.vorher_score) {\n  // Zweitmeinung fehlgeschlagen (z. B. Netzwerk, Guthaben leer): alte Bewertung behalten.\n  return [{ json: { id: r.kontext.id, modell_bewertung: r.kontext.vorher_modell } }];\n}\nif (!r.ok) {\n  return [{ json: { id: r.kontext && r.kontext.id, bewertung: 'fehler', bewertung_begruendung: 'KI-Fehler: ' + (r.fehler || 'keine Antwort'), modell_bewertung: modell, bewertet_am: jetzt } }];\n}\nconst d = r.daten;\nlet score = Math.round(Number(d.passung_score));\nif (!Number.isFinite(score)) score = 3;\nscore = Math.min(5, Math.max(1, score));\nconst bewertung = score >= 4 ? 'passt gut' : score === 3 ? 'passt teilweise' : 'passt nicht';\nreturn [\n  {\n    json: {\n      id: r.kontext.id,\n      passung_score: score,\n      bewertung,\n      // Zusatzinfos als [Markierungen] am Ende – die Ergebnis-Seite zeigt sie als eigene Felder an.\n      bewertung_begruendung:\n        String(d.begruendung || '') +\n        ` [Dev-Skills: ${d.dev_skills_nutzen || '?'}${d.dev_skills_wie ? ' – ' + d.dev_skills_wie : ''}]` +\n        ` [Signalwörter + ${r.kontext.signale_plus || '–'} | − ${r.kontext.signale_minus || '–'}]` +\n        // Bei einer Zweitmeinung: vorherige lokale Bewertung festhalten (zum Vergleichen)\n        (r.anbieter === 'claude' && /^(ollama|claude):/.test(String(r.kontext.vorher_modell || '')) && String(r.kontext.vorher_modell) !== `claude:${r.modell}` && r.kontext.vorher_score\n          ? ` [Vorher ${String(r.kontext.vorher_modell).startsWith('ollama') ? 'lokal' : 'Haiku'}: ${r.kontext.vorher_score}]`\n          : ''),\n      pflichtkriterien_erfuellt: String(d.pflichtkriterien_erfuellt || ''),\n      luecken: String(d.luecken || ''),\n      offene_fragen: String(d.offene_fragen || ''),\n      warnsignale: String(d.warnsignale || ''),\n      modell_bewertung: modell,\n      bewertet_am: jetzt,\n    },\n  },\n];"
+      },
+      "notes": "Score 4–5 = passt gut, 3 = teilweise, 1–2 = passt nicht.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7ba17c9e-02a9-4728-8148-588ee006c46e",
+      "name": "Bewertung speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Schreibt die Bewertung in die Zeile.",
+      "notesInFlow": true
+    },
+    {
+      "id": "5263a9d4-6001-44ea-8fd9-d677c5ea161a",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const z = {};\nfor (const i of $input.all()) z[i.json.bewertung || 'ohne'] = (z[i.json.bewertung || 'ohne'] || 0) + 1;\nreturn [{ json: { bewertet: $input.all().length, ergebnis: z, tipp: 'Ergebnis-Seite: http://localhost:3000/ergebnisse' } }];"
+      },
+      "notes": "Wie viele passen gut / teilweise / nicht.",
+      "notesInFlow": true
+    },
+    {
+      "id": "cb24e876-b9d5-4361-87a8-a927fa196813",
+      "name": "Start per Kette",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        420
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-schritt-4",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Automatischer Start durch den vorherigen Schritt (POST /webhook/kette-schritt-4).",
+      "notesInFlow": true,
+      "webhookId": "bc32a189-4a55-4533-988a-6e3106055647"
+    },
+    {
+      "id": "646d397a-52df-4ab0-a1d4-4fc96e6a6a53",
+      "name": "Gibt es Arbeit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        840,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "39dacbee-b21b-4f16-a4e1-47bb00d18fdb",
+              "leftValue": "={{ $json._leer !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "false = nichts mehr zu bewerten → gleich weiter zur Zweitmeinung.",
+      "notesInFlow": true
+    },
+    {
+      "id": "78cd25f1-dad7-4711-89cf-31f7b7304a05",
+      "name": "Nur Zweitmeinung?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d9928655-bd69-4bf6-b14c-ff9186b6e7a0",
+              "leftValue": "={{ $('📝 Meine Kriterien').first().json.nur_zweitmeinung === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = lokalen Durchgang überspringen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "89af09c7-fc2d-4c49-9256-32af0dc97b4d",
+      "name": "Zweitmeinung automatisch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1fa231d-595e-4391-bb72-95b2ff936f40",
+              "leftValue": "={{ $('📝 Meine Kriterien').first().json.zweitmeinung_automatisch === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "Nach dem lokalen Durchgang direkt weiter mit Claude.",
+      "notesInFlow": true
+    },
+    {
+      "id": "27ecc308-6e0f-47ee-95cb-0c053bdf9352",
+      "name": "Zweitmeinung vorbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        60
+      ],
+      "parameters": {
+        "jsCode": "// Gleiche Kriterien, aber jetzt mit dem Zweitmeinungs-Modell (z. B. Claude Sonnet).\nconst k = $('📝 Meine Kriterien').first().json;\nreturn [\n  {\n    json: {\n      ...k,\n      anbieter_override: k.zweitmeinung_anbieter || 'claude',\n      funktion_override: 'zweitmeinung',\n      claude_modell_override: k.zweitmeinung_modell || 'claude-sonnet-5-5',\n      ollama_denken_override: 'an',\n    },\n  },\n];"
+      },
+      "notes": "Übergibt Kriterien + Modellwahl an C2.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1909e62e-d543-4480-8932-a4141dc60f75",
+      "name": "Zweitmeinung starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        60
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-zweitmeinung",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "notes": "Startet \"Baustein · Claude-Zweitmeinung\" als eigenen Lauf (Staffellauf).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "517aa8cb-6199-4a22-a89e-2b7073d7d146",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Schritt%204%20%C2%B7%20KI%20bewertet",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "9e6b8c7f-9747-4e55-b417-31bec82efe7b",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3120,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f2f86581-9fda-4177-ab6e-f98f209cc17d",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "64069037-a6bc-498e-8ff0-0fe3dde01f08",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "b2a30a7c-aef6-46e7-a4ec-e893bbed54f1",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('Bewertung speichern').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "📝 Standard-Kriterien",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start per Kette": {
+      "main": [
+        [
+          {
+            "node": "📝 Standard-Kriterien",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Standard-Kriterien": {
+      "main": [
+        [
+          {
+            "node": "Profil laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profil laden": {
+      "main": [
+        [
+          {
+            "node": "📝 Meine Kriterien",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Meine Kriterien": {
+      "main": [
+        [
+          {
+            "node": "Nur Zweitmeinung?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nur Zweitmeinung?": {
+      "main": [
+        [
+          {
+            "node": "Zweitmeinung vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aktive Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zusammenfassung": {
+      "main": [
+        [
+          {
+            "node": "Zweitmeinung automatisch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zweitmeinung automatisch?": {
+      "main": [
+        [
+          {
+            "node": "Zweitmeinung vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zweitmeinung vorbereiten": {
+      "main": [
+        [
+          {
+            "node": "Zweitmeinung starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aktive Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Auswahl & Ausschlussliste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auswahl & Ausschlussliste": {
+      "main": [
+        [
+          {
+            "node": "Gibt es Arbeit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es Arbeit?": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Zweitmeinung automatisch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Schon entschieden?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schon entschieden?": {
+      "main": [
+        [
+          {
+            "node": "Bewertung aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seitentext aus Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seitentext aus Cache": {
+      "main": [
+        [
+          {
+            "node": "Bewertungs-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertungs-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Bewertungs-Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertungs-Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "Stufe 6: KI-Bewertung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 6: KI-Bewertung": {
+      "main": [
+        [
+          {
+            "node": "Bewertung aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertung aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Bewertung speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertung speichern": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Stufe 6: Bewertung auf gespeicherten Fakten, separat startbar.",
+  "tags": [],
+  "isArchived": false
+}

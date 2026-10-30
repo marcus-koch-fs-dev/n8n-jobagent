@@ -1,0 +1,283 @@
+{
+  "id": "jaModelleH00001",
+  "name": "9 Einstellungen · Verfügbare KI-Modelle abfragen",
+  "nodes": [
+    {
+      "id": "4385f52c-ca7c-42e8-9c7e-0efe35ec2a7b",
+      "name": "Notiz be9521",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -300
+      ],
+      "parameters": {
+        "content": "## 🧠 Modelle abfragen\nDie Einstellungs-Seite fragt hier, welche Modelle es **gerade** gibt – mit den Schlüsseln aus n8n → Credentials.\n\n- **Claude / OpenAI / Gemini / Mistral:** je eine Modellliste (kostenlos, verbraucht kein Guthaben)\n- Kein Schlüssel eingetragen → Anbieter erscheint auf der Seite nicht.\n\nDer Schlüssel verlässt n8n nie – die Seite bekommt nur die Modellnamen.",
+        "width": 620,
+        "height": 260,
+        "color": 4
+      }
+    },
+    {
+      "id": "59c68b15-7054-4979-b68b-3668793cf302",
+      "name": "Seite fragt nach Modellen",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "modelle",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "GET http://localhost:5678/webhook/modelle",
+      "notesInFlow": true,
+      "webhookId": "f1d93990-b59c-421a-86a3-dbfebeff7c1e"
+    },
+    {
+      "id": "d271b5b2-38f2-4578-989d-b12e5d6afa27",
+      "name": "Claude: Modellliste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.anthropic.com/v1/models?limit=100",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        }
+      },
+      "notes": "Listet alle Claude-Modelle, die dein Schlüssel nutzen darf (neueste zuerst).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jaAnthropicKey01",
+          "name": "Anthropic API Key"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bf61ad7d-d8d6-4c79-abf7-0d3db91a22ea",
+      "name": "OpenAI: Modellliste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        380
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.openai.com/v1/models",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi"
+      },
+      "notes": "Nur wenn in n8n ein OpenAI-Schlüssel eingetragen ist – sonst Fehler → GPT wird nicht angezeigt.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "openAiApi": {
+          "id": "jaOpenAIKey00001",
+          "name": "OpenAI API Key"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "01cf522b-6785-4e2f-852f-6d9611727655",
+      "name": "Gemini: Modellliste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        380
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi"
+      },
+      "notes": "Nur wenn ein Gemini-Schlüssel eingetragen ist.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "jaGeminiKey00001",
+          "name": "Gemini API Key"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "58e6e0e7-0e8f-4df8-805d-594637470536",
+      "name": "Mistral: Modellliste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        380
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.mistral.ai/v1/models",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mistralCloudApi"
+      },
+      "notes": "Nur wenn ein Mistral-Schlüssel eingetragen ist.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "jaMistralKey0001",
+          "name": "Mistral API Key"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "d039e42a-9dbd-422a-9c32-424a45c91001",
+      "name": "Liste zusammenstellen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const fehlerText = (r) => {\n  const e = r && r.error;\n  if (!e) return '';\n  const t = typeof e === 'string' ? e : e.message || JSON.stringify(e);\n  if (/authentication_error|invalid x-api-key|invalid_api_key|API key not valid|API_KEY_INVALID|Authorization failed|Unauthorized|Forbidden|\\b40[013]\\b/i.test(t)) return 'kein gültiger Schlüssel eingetragen';\n  if (/ECONNREFUSED|ENOTFOUND|timeout/i.test(t)) return 'nicht erreichbar';\n  return t.slice(0, 200);\n};\nconst c = $('Claude: Modellliste').first().json || {};\nconst claudeModelle = Array.isArray(c.data) ? c.data.filter((m) => m.type === 'model' || !m.type).map((m) => ({ id: m.id, name: m.display_name || m.id, erstellt: m.created_at || '' })) : [];\n// OpenAI: nur Chat-Modelle (keine Bild-, Audio-, Embedding-Modelle), neueste zuerst\nconst oa = $('OpenAI: Modellliste').first().json || {};\nconst openaiModelle = Array.isArray(oa.data)\n  ? oa.data\n      .filter((m) => /^(gpt-|o\\d|chatgpt-)/.test(m.id) && !/(audio|realtime|tts|transcribe|image|search|embedding|instruct|moderation)/.test(m.id))\n      .sort((a, b) => (b.created || 0) - (a.created || 0))\n      .map((m) => ({ id: m.id, name: m.id }))\n  : [];\n// Gemini: nur Modelle, die Text erzeugen können\nconst ge = $('Gemini: Modellliste').first().json || {};\nconst geminiModelle = Array.isArray(ge.models)\n  ? ge.models\n      .filter((m) => /gemini/.test(m.name) && (m.supportedGenerationMethods || []).includes('generateContent') && !/(embedding|image|tts|audio)/.test(m.name))\n      .map((m) => ({ id: String(m.name).replace(/^models\\//, ''), name: m.displayName || m.name }))\n  : [];\n// Mistral: nur Chat-Modelle\nconst mi = $('Mistral: Modellliste').first().json || {};\nconst mistralModelle = Array.isArray(mi.data)\n  ? mi.data\n      .filter((m) => !m.capabilities || m.capabilities.completion_chat)\n      .sort((a, b) => (b.created || 0) - (a.created || 0))\n      .map((m) => ({ id: m.id, name: m.name || m.id }))\n  : [];\nconst eintrag = (liste, roh) => ({ ok: liste.length > 0, modelle: liste, fehler: liste.length ? '' : fehlerText(roh) || 'kein Schlüssel eingetragen' });\nreturn [\n  {\n    json: {\n      abgefragt_am: new Date().toISOString(),\n      anbieter: {\n        claude: eintrag(claudeModelle, c),\n        openai: eintrag(openaiModelle, oa),\n        gemini: eintrag(geminiModelle, ge),\n        mistral: eintrag(mistralModelle, mi),\n      },\n    },\n  },\n];"
+      },
+      "notes": "Nur Namen und IDs – keine Schlüssel.",
+      "notesInFlow": true
+    },
+    {
+      "id": "07d3c754-7c2c-45f0-8f16-9be16cd7822e",
+      "name": "Antwort an die Seite",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "notes": "JSON zurück.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Seite fragt nach Modellen": {
+      "main": [
+        [
+          {
+            "node": "Claude: Modellliste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Modellliste": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: Modellliste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: Modellliste": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Modellliste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Modellliste": {
+      "main": [
+        [
+          {
+            "node": "Mistral: Modellliste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral: Modellliste": {
+      "main": [
+        [
+          {
+            "node": "Liste zusammenstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liste zusammenstellen": {
+      "main": [
+        [
+          {
+            "node": "Antwort an die Seite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Liefert der Einstellungs-Seite die aktuell verfügbaren Modelle.",
+  "tags": [],
+  "isArchived": false
+}

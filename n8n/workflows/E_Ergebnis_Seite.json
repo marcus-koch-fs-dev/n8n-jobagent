@@ -1,0 +1,1114 @@
+{
+  "id": "jaErgebnisSeiteE",
+  "name": "9 Technik · Schnittstelle für die Ergebnis-Seite",
+  "nodes": [
+    {
+      "id": "c04251ad-fa93-466b-af4a-e5ba6fc0af4e",
+      "name": "Notiz db144b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## E – Ergebnis-Seite (Backend)\nDie Seite selbst: **http://localhost:3000/ergebnisse**\n\nDieser Workflow ist das „Backend“ dazu – zwei **Webhooks** (Adressen, die n8n im Hintergrund beantwortet):\n- **GET /webhook/jobs-daten** → liefert alle Stellen + deine Tendenzen als JSON\n- **POST /webhook/jobs-aktion** → speichert Tendenz, Notiz oder Freigabe\n\nDer Workflow muss **veröffentlicht (Publish)** sein, sonst sind die Adressen nicht erreichbar.\nDeine Tendenzen/Notizen liegen in der Data Table **meine_auswahl**.",
+        "width": 760,
+        "height": 330,
+        "color": 4
+      }
+    },
+    {
+      "id": "ccd740cd-7039-46b6-aa22-16e112ed0770",
+      "name": "Webhook: Daten abrufen",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "jobs-daten",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "GET http://localhost:5678/webhook/jobs-daten",
+      "notesInFlow": true,
+      "webhookId": "7749e35d-5a56-443c-b26b-be2e89eb04e9"
+    },
+    {
+      "id": "314e1d67-51e9-4d2f-90f7-2608fe43ebc4",
+      "name": "Tabelle \"meine_auswahl\" sicherstellen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "meine_auswahl",
+        "columns": {
+          "column": [
+            {
+              "name": "job_id",
+              "type": "number"
+            },
+            {
+              "name": "tendenz",
+              "type": "string"
+            },
+            {
+              "name": "notiz",
+              "type": "string"
+            },
+            {
+              "name": "geaendert_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Legt die Tabelle beim ersten Aufruf an.",
+      "notesInFlow": true
+    },
+    {
+      "id": "40d2f843-bd48-4bdb-acdc-78c7e1b111e3",
+      "name": "Alle Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Alle Zeilen aus \"jobs\".",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "994b732f-b3d6-4c3d-898f-9e8c8df23d50",
+      "name": "Meine Auswahl laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "meine_auswahl"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Deine Tendenzen und Notizen.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "f5e8936d-eb6c-4434-8065-fa55c660d14e",
+      "name": "Tabelle \"einordnung\" sicherstellen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        40
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "einordnung",
+        "columns": {
+          "column": [
+            {
+              "name": "job_id",
+              "type": "number"
+            },
+            {
+              "name": "bereich",
+              "type": "string"
+            },
+            {
+              "name": "hauptgrund",
+              "type": "string"
+            },
+            {
+              "name": "beschreibung",
+              "type": "string"
+            },
+            {
+              "name": "kurz",
+              "type": "string"
+            },
+            {
+              "name": "bewertet_am",
+              "type": "string"
+            },
+            {
+              "name": "modell",
+              "type": "string"
+            },
+            {
+              "name": "eingeordnet_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Für Tab 4 · Auswertung (Workflow F füllt sie).",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "81fd4525-c61b-47f4-b5e4-91495ab425e5",
+      "name": "Einordnung laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        40
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "einordnung"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Bereich / Hauptgrund pro Stelle.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "29c2079e-a8a6-46d7-b191-1bfb3f3feb09",
+      "name": "Tabelle \"tiefencheck\" sicherstellen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "tiefencheck",
+        "columns": {
+          "column": [
+            {
+              "name": "job_id",
+              "type": "number"
+            },
+            {
+              "name": "ampel",
+              "type": "string"
+            },
+            {
+              "name": "ergebnis",
+              "type": "string"
+            },
+            {
+              "name": "modell",
+              "type": "string"
+            },
+            {
+              "name": "geprueft_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Für den Tiefen-Check (Workflow G).",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "e9a03ab9-84aa-4568-899a-97f371133445",
+      "name": "Tiefen-Checks laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "tiefencheck"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Ergebnisse der Tiefen-Checks.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "457f1d7e-2268-453f-bc13-407e23ed954c",
+      "name": "Daten für die Seite zusammenstellen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Nur die Felder, die die Seite braucht – und deine Tendenz pro Stelle dazu.\nconst auswahl = {};\nfor (const i of $('Meine Auswahl laden').all()) if (i.json.job_id) auswahl[i.json.job_id] = i.json;\nconst einordnung = {};\nfor (const i of $('Einordnung laden').all()) if (i.json.job_id) einordnung[i.json.job_id] = i.json;\nconst tiefencheck = {};\nfor (const i of $('Tiefen-Checks laden').all()) if (i.json.job_id) tiefencheck[i.json.job_id] = i.json;\n\nconst FELDER = [\n  'id', 'url', 'domain', 'status', 'hinweis', 'freigabe', 'nicht_mehr_gelistet', 'screenshot', 'cache_id', 'duplikat_von',\n  'veroeffentlichungsdatum', 'alter_tage', 'jobtitel', 'firma', 'ort', 'remote', 'remote_regel_wortlaut', 'gehalt',\n  'vertragsform', 'bewerbungsweg', 'kurze_zusammenfassung', 'passung_score', 'bewertung', 'bewertung_begruendung',\n  'pflichtkriterien_erfuellt', 'luecken', 'offene_fragen', 'warnsignale', 'modell_bewertung', 'bewertet_am', 'erstmals_gesehen', 'linktext',\n];\nconst jobs = $('Alle Stellen laden')\n  .all()\n  .map((i) => i.json)\n  .filter((r) => r && r.id)\n  .map((r) => {\n    const o = {};\n    for (const f of FELDER) o[f] = r[f] === undefined ? null : r[f];\n    const a = auswahl[r.id] || {};\n    o.tendenz = a.tendenz || '';\n    o.notiz = a.notiz || '';\n    o.tendenz_geaendert_am = a.geaendert_am || '';\n    // Einordnung nur, wenn sie zur aktuellen Bewertung passt (sonst veraltet)\n    const ein = einordnung[r.id];\n    const aktuell = ein && ein.bewertet_am === String(r.bewertet_am || '');\n    o.bereich = ein ? ein.bereich : '';\n    o.hauptgrund = aktuell ? ein.hauptgrund : '';\n    o.beschreibung = aktuell ? ein.beschreibung : '';\n    o.einordnung_kurz = aktuell ? ein.kurz : '';\n    const tc = tiefencheck[r.id];\n    o.tc_ampel = tc ? tc.ampel : '';\n    o.tc_ergebnis = tc ? tc.ergebnis : '';\n    o.tc_modell = tc ? tc.modell : '';\n    o.tc_am = tc ? tc.geprueft_am : '';\n    return o;\n  });\nreturn [{ json: { ok: true, erzeugt_am: new Date().toISOString(), anzahl: jobs.length, jobs } }];"
+      },
+      "notes": "Verbindet \"jobs\" mit \"meine_auswahl\".",
+      "notesInFlow": true
+    },
+    {
+      "id": "5d09bc73-16a4-4d19-9007-b3a93df3268f",
+      "name": "Daten zurückgeben",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "notes": "Antwort an die Seite (JSON).",
+      "notesInFlow": true
+    },
+    {
+      "id": "bcebbaa6-3f89-490e-a8da-5d8a2d650da5",
+      "name": "Webhook: Änderung speichern",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        560
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jobs-aktion",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "POST http://localhost:5678/webhook/jobs-aktion",
+      "notesInFlow": true,
+      "webhookId": "463b0aab-9032-41a2-8735-761d660cf829"
+    },
+    {
+      "id": "4268d5a4-f5ab-4057-9449-4960e76ae6c2",
+      "name": "Eingabe prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        560
+      ],
+      "parameters": {
+        "jsCode": "// Nie blind übernehmen, was von außen kommt: nur bekannte Aktionen und Werte zulassen.\nlet b = $json.body || {};\nif (typeof b === 'string') {\n  try {\n    b = JSON.parse(b);\n  } catch (e) {\n    b = {};\n  }\n}\nconst id = Number(b.id);\nconst aktion = String(b.aktion || '');\nlet wert = String(b.wert === undefined || b.wert === null ? '' : b.wert);\nconst TENDENZEN = ['', 'interessant', 'vielleicht', 'nein', 'beworben', 'weg']; // weg = Stelle nicht mehr verfügbar\nconst textHash = String(b.text_hash || '');\nlet fehler = '';\nif (aktion !== 'link' && (!Number.isInteger(id) || id <= 0)) fehler = 'ungültige id';\nelse if (aktion === 'tendenz' && !TENDENZEN.includes(wert)) fehler = 'ungültige Tendenz';\nelse if (aktion === 'freigabe' && !['', 'OK'].includes(wert)) fehler = 'ungültige Freigabe';\nelse if (aktion === 'notiz') wert = wert.slice(0, 2000);\nelse if (aktion === 'manuell' && !(/^[a-f0-9]{16}$/.test(wert) && /^[a-f0-9]{20}$/.test(textHash))) fehler = 'ungültiger Cache-Verweis';\nelse if (!['tendenz', 'notiz', 'freigabe', 'manuell', 'link'].includes(aktion)) fehler = 'unbekannte Aktion';\n\n// Neuer Link: gleich vereinheitlichen wie in Schritt 1 (sonst gäbe es Dubletten)\n// Hinweis: Im n8n-Code-Knoten gibt es kein \"new URL(...)\".\n// Deshalb zerlegen wir Adressen mit einem regulären Ausdruck selbst.\nfunction zerlegeUrl(roh) {\n  const m = String(roh || '').trim().match(/^(https?):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i);\n  if (!m) return null;\n  return { protokoll: m[1].toLowerCase(), host: m[2].toLowerCase(), pfad: m[3] || '/', query: m[4] || '' };\n}\n\n// Macht aus einer relativen Weiterleitung (\"/karriere\") eine volle Adresse.\nfunction absoluteUrl(ziel, basis) {\n  if (/^https?:\\/\\//i.test(ziel)) return ziel;\n  const b = zerlegeUrl(basis);\n  if (!b) return ziel;\n  if (ziel.startsWith('//')) return b.protokoll + ':' + ziel;\n  if (ziel.startsWith('/')) return b.protokoll + '://' + b.host + ziel;\n  return b.protokoll + '://' + b.host + b.pfad.replace(/[^\\/]*$/, '') + ziel;\n}\n\n// Zeigt eine Adresse nur noch auf eine allgemeine Karriere- oder Startseite?\nfunction istAllgemeineSeite(ziel, original) {\n  const z = zerlegeUrl(ziel);\n  const o = zerlegeUrl(original);\n  if (!z || !o) return false;\n  const pfad = (u) => u.pfad.replace(/\\/+$/, '').toLowerCase();\n  const host = (u) => u.host.replace(/^www\\./, '');\n  if (host(z) === host(o) && pfad(z) === pfad(o)) return false; // z. B. nur http -> https\n  const p = pfad(z);\n  if (p === '') return true;\n  if (/^(\\/[a-z]{2}(-[a-z]{2})?)?(\\/(karriere|career|careers|jobs|job|stellenangebote|stellen|offene-stellen|jobboerse|join-us|joinus|vacancies|work-with-us|search|suche))*$/.test(p)) return true;\n  if (/[?&](error|expired|notfound|jobnotfound)=/i.test(z.query)) return true;\n  return false;\n}\nlet url = '';\nif (aktion === 'link') {\n  const u = zerlegeUrl(wert);\n  if (!u) fehler = 'Das ist kein gültiger Link (muss mit http:// oder https:// beginnen)';\n  else {\n    const params = u.query.replace(/^\\?/, '').split('&').filter(Boolean).filter((p) => !/^(utm_|gclid|fbclid|mc_|ref=|ref_|source=|trk|trackingid|_hs|hsa_)/i.test(p));\n    let pfad = u.pfad || '/';\n    if (pfad !== '/' && params.length === 0) pfad = pfad.replace(/\\/+$/, '') || '/';\n    url = `https://${u.host}${pfad}${params.length ? '?' + params.join('&') : ''}`;\n  }\n}\nconst ziel = fehler ? 'fehler' : aktion === 'freigabe' ? 'freigabe' : aktion === 'manuell' ? 'manuell' : aktion === 'link' ? 'link' : 'auswahl';\nreturn [{ json: { id, aktion, wert, url, text_hash: textHash, fehler, ziel } }];"
+      },
+      "notes": "Nur erlaubte Aktionen: tendenz, notiz, freigabe.",
+      "notesInFlow": true
+    },
+    {
+      "id": "9ee345cf-0a70-4a73-a71e-c3e1fdd6e7bb",
+      "name": "Was speichern?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        560
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4c398f7f-54e4-4e8d-b1a8-e829a9873e87",
+                    "leftValue": "={{ $json.ziel }}",
+                    "rightValue": "auswahl",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auswahl"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "df7e44e8-2a93-4b5a-bbb2-217619f6139a",
+                    "leftValue": "={{ $json.ziel }}",
+                    "rightValue": "freigabe",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "freigabe"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d47ee7e5-7438-46f1-8e44-98651f130dd4",
+                    "leftValue": "={{ $json.ziel }}",
+                    "rightValue": "fehler",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fehler"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b9983a82-ccbf-4687-8fda-f4706cf0914a",
+                    "leftValue": "={{ $json.ziel }}",
+                    "rightValue": "manuell",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "manuell"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0eda8461-cb83-449a-8a97-49e4b706b17f",
+                    "leftValue": "={{ $json.ziel }}",
+                    "rightValue": "link",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "link"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Tendenz/Notiz → meine_auswahl, Freigabe → jobs.",
+      "notesInFlow": true
+    },
+    {
+      "id": "01ebe7c1-5b32-4182-8eb7-089105fd1e21",
+      "name": "Zeile für meine_auswahl",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        440
+      ],
+      "parameters": {
+        "jsCode": "const e = $input.first().json;\nconst zeile = { job_id: e.id, geaendert_am: new Date().toISOString() };\nzeile[e.aktion] = e.wert; // \"tendenz\" oder \"notiz\"\nreturn [{ json: zeile }];"
+      },
+      "notes": "Nur das geänderte Feld + Zeitstempel.",
+      "notesInFlow": true
+    },
+    {
+      "id": "69faed51-e96d-4748-84a5-ff62eaf76ecf",
+      "name": "In meine_auswahl speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        440
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "meine_auswahl"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.job_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Gibt es die Zeile schon → ändern, sonst neu anlegen (Upsert).",
+      "notesInFlow": true
+    },
+    {
+      "id": "926fc810-f079-4186-86b8-d994a7286089",
+      "name": "Freigabe-Zeile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        640
+      ],
+      "parameters": {
+        "jsCode": "const e = $input.first().json;\nreturn [{ json: { id: e.id, freigabe: e.wert } }];"
+      },
+      "notes": "Setzt freigabe = OK (oder leer).",
+      "notesInFlow": true
+    },
+    {
+      "id": "4a15f80b-9093-4a52-a768-1f53a89a7ca6",
+      "name": "Freigabe in jobs speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        640
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Workflow B verarbeitet danach diese Zeile.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c4b26aa7-0737-4c8f-8eb7-fc881265b568",
+      "name": "Manuellen Text übernehmen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        980
+      ],
+      "parameters": {
+        "jsCode": "// Text liegt schon im Cache (Browser-Dienst). Status \"abgerufen\" → Schritt 3 liest ihn aus.\nconst e = $input.first().json;\nreturn [{ json: { id: e.id, status: 'abgerufen', cache_id: e.wert, text_hash: e.text_hash, screenshot: '', hinweis: 'Text manuell eingefügt – KI-Auswertung folgt (Schritt 3)' } }];"
+      },
+      "notes": "Für Seiten mit Bot-Schutz: Text von Hand eingefügt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f06743cf-fb9d-4fa8-b5e5-aa6dd79dd591",
+      "name": "Status in jobs speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        980
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Status → abgerufen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "d6788286-43ef-4e9d-8eb5-f3e97ff04528",
+      "name": "Link schon bekannt?",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        1180
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "url",
+              "condition": "eq",
+              "keyValue": "={{ $json.url }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Gibt es die Adresse schon in der Tabelle?",
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ec87b35a-dbbd-4971-bc4e-8cf8dea31194",
+      "name": "Neuer Link?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        1180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cc0c7521-cae0-4752-b826-c8c06d001c55",
+              "leftValue": "={{ !$json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = noch nicht in der Tabelle.",
+      "notesInFlow": true
+    },
+    {
+      "id": "71c30e3a-d6fc-4075-b529-1e42a144bba4",
+      "name": "Neue Zeile bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        1120
+      ],
+      "parameters": {
+        "jsCode": "const e = $('Eingabe prüfen').first().json;\nreturn [\n  {\n    json: {\n      url: e.url,\n      domain: e.url.replace(/^https:\\/\\//, '').split('/')[0].replace(/^www\\./, ''),\n      linktext: '(manuell hinzugefügt)',\n      erstmals_gesehen: new Date().toISOString(),\n      nicht_mehr_gelistet: false,\n      status: 'neu',\n      freigabe: '',\n    },\n  },\n];"
+      },
+      "notes": "Status \"neu\" → wird beim nächsten \"Seiten laden\" verarbeitet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "61b63c1b-15bc-4a67-9793-7612c38a5a50",
+      "name": "Link eintragen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        1120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Neue Zeile in \"jobs\".",
+      "notesInFlow": true
+    },
+    {
+      "id": "241dc144-db98-4718-a741-732d1f837fb3",
+      "name": "Link war schon bekannt",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        1300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, schon_bekannt: true } }}",
+        "options": {}
+      },
+      "notes": "Nichts doppelt anlegen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "45a06794-c8aa-4837-8ba9-edb72a3217a1",
+      "name": "Gespeichert",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        540
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true } }}",
+        "options": {}
+      },
+      "notes": "Antwort: ok",
+      "notesInFlow": true
+    },
+    {
+      "id": "c328b313-df46-48e2-97d3-d70fe74ba2fd",
+      "name": "Fehler melden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        820
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, fehler: $json.fehler } }}",
+        "options": {}
+      },
+      "notes": "Antwort mit Fehlermeldung.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Webhook: Daten abrufen": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"meine_auswahl\" sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabelle \"meine_auswahl\" sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Alle Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alle Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Meine Auswahl laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meine Auswahl laden": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"einordnung\" sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabelle \"einordnung\" sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Einordnung laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Einordnung laden": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"tiefencheck\" sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabelle \"tiefencheck\" sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Tiefen-Checks laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiefen-Checks laden": {
+      "main": [
+        [
+          {
+            "node": "Daten für die Seite zusammenstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daten für die Seite zusammenstellen": {
+      "main": [
+        [
+          {
+            "node": "Daten zurückgeben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Änderung speichern": {
+      "main": [
+        [
+          {
+            "node": "Eingabe prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eingabe prüfen": {
+      "main": [
+        [
+          {
+            "node": "Was speichern?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was speichern?": {
+      "main": [
+        [
+          {
+            "node": "Zeile für meine_auswahl",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Freigabe-Zeile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fehler melden",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manuellen Text übernehmen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Link schon bekannt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manuellen Text übernehmen": {
+      "main": [
+        [
+          {
+            "node": "Status in jobs speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status in jobs speichern": {
+      "main": [
+        [
+          {
+            "node": "Gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link schon bekannt?": {
+      "main": [
+        [
+          {
+            "node": "Neuer Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Neuer Link?": {
+      "main": [
+        [
+          {
+            "node": "Neue Zeile bauen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Link war schon bekannt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Neue Zeile bauen": {
+      "main": [
+        [
+          {
+            "node": "Link eintragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link eintragen": {
+      "main": [
+        [
+          {
+            "node": "Gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeile für meine_auswahl": {
+      "main": [
+        [
+          {
+            "node": "In meine_auswahl speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In meine_auswahl speichern": {
+      "main": [
+        [
+          {
+            "node": "Gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freigabe-Zeile": {
+      "main": [
+        [
+          {
+            "node": "Freigabe in jobs speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freigabe in jobs speichern": {
+      "main": [
+        [
+          {
+            "node": "Gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Webhooks für http://localhost:3000/ergebnisse",
+  "tags": [],
+  "isArchived": false
+}

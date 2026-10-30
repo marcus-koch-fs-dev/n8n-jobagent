@@ -1,0 +1,16 @@
+# Niemals hochladen – persönliche Daten und Schlüssel
+#   .env   → Verschlüsselungs-Schlüssel für n8n (damit sind deine API-Schlüssel in n8n verschlüsselt)
+#   data/  → Lebenslauf, Profil, gespeicherte Anzeigen, Anschreiben, Browser-Profil mit deiner Missionfrei-Anmeldung
+.env
+data/
+bewerbungen/
+
+# Die API-Schlüssel selbst liegen NICHT in Dateien, sondern verschlüsselt in der n8n-Datenbank
+# (Docker-Volume "n8n_data") – sie können also gar nicht versehentlich ins Repository geraten.
+
+# Sonstiges
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+

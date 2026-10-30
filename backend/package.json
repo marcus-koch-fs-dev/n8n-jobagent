@@ -1,0 +1,27 @@
+{
+  "name": "jobagent-browser",
+  "version": "1.0.0",
+  "description": "Job-Agent Backend: HTTP-Dienst, der Stellenseiten mit Chromium (Playwright) abruft, Daten speichert und die Oberfläche ausliefert. Wird von n8n-Workflows aufgerufen.",
+  "license": "MIT",
+  "author": "Marcus Koch",
+  "keywords": ["job-search", "n8n", "playwright", "automation", "llm"],
+  "main": "dist/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "tsc && node --test dist/test/*.test.js"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "jszip": "3.10.1",
+    "mammoth": "1.8.0",
+    "pdf-parse": "2.4.5",
+    "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

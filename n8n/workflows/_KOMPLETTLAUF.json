@@ -1,0 +1,210 @@
+{
+  "id": "jaKomplettlauf01",
+  "name": "0 ▶ Komplettlauf (startet Schritt 1–4 automatisch)",
+  "nodes": [
+    {
+      "id": "e06c707e-ed15-4a5e-bb8d-4c23b53af870",
+      "name": "Notiz 19472e",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -400
+      ],
+      "parameters": {
+        "content": "## ▶ KOMPLETTLAUF – alles automatisch\nStartet **Schritt 1**. Jeder Schritt gibt am Ende selbst den Staffelstab an den nächsten weiter (eigener Lauf, unter „Executions“ einzeln sichtbar):\n\n1. **Links holen** – neue Links von Missionfrei (gesperrt? → gespeicherte Liste)\n2. **Seiten laden** – Browser speichert Text + Screenshot (ohne KI, ca. 3 s/Seite)\n3. **KI liest Fakten** – qwen3 (GPU, ca. 15–25 s/Stelle)\n4. **KI bewertet** – qwen3 lokal, danach **Claude-Zweitmeinung** für Score ≥ 3\n\nJeder Schritt macht nur, was noch offen ist. `bis_schritt` = 2 → nur Schritt 1–2 (ohne KI).\n\n**Starten:** Knopf auf http://localhost:3000/ergebnisse oder hier „Execute workflow“.\n**Jeden Abend automatisch:** Knoten „⏰ Jeden Abend 22 Uhr“ aktivieren (Rechtsklick → Activate) und Publish.",
+        "width": 780,
+        "height": 400,
+        "color": 4
+      }
+    },
+    {
+      "id": "0de28ac8-638f-4173-a5fb-54f08f81ffee",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a1aec791-8631-449c-9374-0bf645d9c0f0",
+      "name": "Start-Knopf (Ergebnis-Seite)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        340
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "komplettlauf",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "POST http://localhost:5678/webhook/komplettlauf  {\"bis_schritt\": 2|4}",
+      "notesInFlow": true,
+      "webhookId": "ca8a2a3d-3718-4f11-be4d-4b948b0cec71"
+    },
+    {
+      "id": "1e0ba5f3-50a7-497f-80b0-8e6dbed4ee57",
+      "name": "⏰ Jeden Abend 22 Uhr",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        520
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 22,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "notes": "Ausgeschaltet. Zum Einschalten: Rechtsklick → Activate, dann Publish.",
+      "notesInFlow": true,
+      "disabled": true
+    },
+    {
+      "id": "bed64197-7006-4e77-b1fa-69537082d1d5",
+      "name": "⚙️ Komplettlauf-Einstellungen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        340
+      ],
+      "parameters": {
+        "jsCode": "// bis_schritt: 2 = nur Links + Seiten laden (ohne KI), 4 = alles.\nconst body = $json.body && typeof $json.body === 'object' ? $json.body : {};\nconst bis = [1, 2, 3, 4].includes(Number(body.bis_schritt)) ? Number(body.bis_schritt) : 4;\nreturn [{ json: { bis_schritt: bis, gestartet_am: new Date().toISOString() } }];"
+      },
+      "notes": "Ohne Angabe: alle 4 Schritte.",
+      "notesInFlow": true
+    },
+    {
+      "id": "bfa33095-22f4-40bd-9a48-7103139569b5",
+      "name": "Pause aufheben",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        340
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/pause",
+        "options": {
+          "timeout": 10000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pausiert: false }) }}"
+      },
+      "notes": "Ein neuer Start hebt eine alte Pause auf (= Fortsetzen).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "bd25fef2-bf47-490c-be11-d751a88f800c",
+      "name": "Schritt 1 starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        340
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-schritt-1",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ bis_schritt: $('⚙️ Komplettlauf-Einstellungen').first().json.bis_schritt }) }}"
+      },
+      "notes": "Ab hier läuft alles von selbst weiter: 1 → 2 → 3 → 4 → Zweitmeinung.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Komplettlauf-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start-Knopf (Ergebnis-Seite)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Komplettlauf-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ Jeden Abend 22 Uhr": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Komplettlauf-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Komplettlauf-Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Pause aufheben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause aufheben": {
+      "main": [
+        [
+          {
+            "node": "Schritt 1 starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Startet den Staffellauf Schritt 1–4.",
+  "tags": [],
+  "isArchived": false
+}

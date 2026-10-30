@@ -1,0 +1,425 @@
+{
+  "id": "jaVergleichD0001",
+  "name": "Archiv · Modellvergleich Claude vs. Ollama (alt)",
+  "nodes": [
+    {
+      "id": "4a9fde43-a0ca-40fa-a35e-607dfe325c88",
+      "name": "Notiz 649a0c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## D – Modellvergleich (zum Lernen)\nNimmt bis zu `anzahl` Stellen aus dem **Cache** und lässt die **Extraktion** von **Claude und Ollama** laufen – mit genau demselben Prompt.\n\nErgebnis in der Tabelle **vergleich**: jedes Feld nebeneinander (`_claude` / `_ollama`), Laufzeit, Übereinstimmung und Unterschiede.\n\n**Worauf achten?** Datum, Remote-Regel, Gehalt und Seitentyp sind die typischen Stolpersteine kleiner Modelle. Kosten: Claude kostet pro Seite ein paar Zehntel Cent, Ollama ist gratis, aber langsamer.",
+        "width": 760,
+        "height": 330,
+        "color": 4
+      }
+    },
+    {
+      "id": "c1477d5c-4fb4-4ca8-aee4-b0d3d8c54e31",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "954fd164-e06e-4bb2-b1c8-e0e2cd9ccd5f",
+      "name": "⚙️ Vergleich-Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "17a117bb-7e13-4854-9865-35f7e64ac6ee",
+              "name": "anzahl",
+              "value": 20,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Wie viele Seiten verglichen werden.",
+      "notesInFlow": true
+    },
+    {
+      "id": "e2936432-59fa-48dc-a58c-5eddce0b3c4b",
+      "name": "Stellen mit Cache laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "aktiv"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "unklar"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "abgelaufen"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "zu_alt"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "duplikat"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Nur Stellen, deren Text schon im Cache liegt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "65748c07-a546-4acb-bfd2-a5641492dd16",
+      "name": "Auswahl",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const anzahl = Number($('⚙️ Vergleich-Einstellungen').first().json.anzahl || 20);\nreturn $input\n  .all()\n  .filter((i) => i.json.cache_id)\n  .slice(0, anzahl)\n  .map((i) => ({ json: { id: i.json.id, url: i.json.url, cache_id: i.json.cache_id } }));"
+      },
+      "notes": "Die ersten \"anzahl\" Stellen mit Cache.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a8df49e0-6bee-4868-8fb2-c4aaafe45fde",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "98ce469d-2958-48a4-b021-20417ea98b24",
+      "name": "Seitentext aus Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Gespeicherter Text.",
+      "notesInFlow": true
+    },
+    {
+      "id": "5cb149d2-668f-4bb8-b405-f4449c30666d",
+      "name": "Extraktions-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/extraktion.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Derselbe Prompt wie in Stufe 4.",
+      "notesInFlow": true
+    },
+    {
+      "id": "11c8fca2-675b-47c3-957a-9fd36abe4b78",
+      "name": "Zwei Anfragen bauen (Claude + Ollama)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: eine Stelle nach der anderen').first().json;\nconst cache = $('Seitentext aus Cache').first().json;\n\nconst vorlage = String($json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, k) => (k in werte ? werte[k] : m));\n\n// Gleiches Schema wie in \"02 Stelle verarbeiten\" → \"Extraktions-Anfrage bauen\"\nconst text = (beschreibung) => ({ type: 'string', description: beschreibung });\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['seitentyp', 'status', 'datum_zitat', 'veroeffentlichungsdatum', 'jobtitel', 'firma', 'ort', 'remote', 'remote_regel_wortlaut', 'gehalt', 'vertragsform', 'bewerbungsweg', 'kurze_zusammenfassung', 'begruendung'],\n  properties: {\n    seitentyp: { type: 'string', enum: ['einzelne_stelle', 'stellenliste', 'keine_stelle'] },\n    status: { type: 'string', enum: ['aktiv', 'abgelaufen', 'unklar'] },\n    datum_zitat: text('Wörtliche Textstelle mit dem Veröffentlichungsdatum oder leer'),\n    veroeffentlichungsdatum: text('YYYY-MM-DD oder leer'),\n    jobtitel: text('Jobtitel'),\n    firma: text('Firmenname'),\n    ort: text('Ort/Land'),\n    remote: { type: 'string', enum: ['ja', 'nein', 'hybrid', 'unklar'] },\n    remote_regel_wortlaut: text('Wörtliches Zitat zur Remote-Regel'),\n    gehalt: text('Gehalt/Stundensatz wie angegeben'),\n    vertragsform: text('z. B. Festanstellung, Freelance, EOR'),\n    bewerbungsweg: text('z. B. Formular, E-Mail'),\n    kurze_zusammenfassung: text('2–3 Sätze'),\n    begruendung: text('1–2 Sätze zu status und seitentyp'),\n  },\n};\n\nconst basis = {\n  system,\n  anfrage: fuellen(anfrage, { HEUTE: $now.toFormat('yyyy-MM-dd'), URL: row.url, TITEL: cache.title || '', SEITENTEXT: '{{SEITENTEXT}}' }),\n  seitentext: cache.text || '',\n  schema: SCHEMA,\n  kontext: { id: row.id, url: row.url, cache_id: row.cache_id },\n};\n// Zwei Items = zwei Aufrufe von \"00 KI-Aufruf\", einmal pro Modell\nreturn [{ json: { ...basis, anbieter_override: 'claude' } }, { json: { ...basis, anbieter_override: 'ollama' } }];"
+      },
+      "notes": "Dieselbe Anfrage zweimal – einmal pro Modell.",
+      "notesInFlow": true
+    },
+    {
+      "id": "80d5dcd0-d417-4ead-967f-74122ee60924",
+      "name": "Beide Modelle fragen",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Läuft nacheinander: erst Claude, dann Ollama.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f837a670-8c0c-4c58-8c1e-fe8470a09450",
+      "name": "Nebeneinander stellen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const alle = $input.all().map((i) => i.json);\nconst c = alle.find((x) => x.anbieter === 'claude') || {};\nconst o = alle.find((x) => x.anbieter === 'ollama') || {};\nconst kontext = c.kontext || o.kontext || {};\nconst dc = c.daten || {};\nconst dO = o.daten || {};\nconst FELDER = {\n  seitentyp: 'seitentyp',\n  status: 'status',\n  datum: 'veroeffentlichungsdatum',\n  jobtitel: 'jobtitel',\n  firma: 'firma',\n  remote: 'remote',\n  remote_regel: 'remote_regel_wortlaut',\n  gehalt: 'gehalt',\n  vertragsform: 'vertragsform',\n  zusammenfassung: 'kurze_zusammenfassung',\n};\nconst out = { url: kontext.url, cache_id: kontext.cache_id };\nconst gleich = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();\nlet treffer = 0;\nlet vergleichbar = 0;\nconst unterschiede = [];\nfor (const [spalte, feld] of Object.entries(FELDER)) {\n  out[`${spalte}_claude`] = String(dc[feld] ?? '');\n  out[`${spalte}_ollama`] = String(dO[feld] ?? '');\n  if (spalte === 'zusammenfassung') continue; // Freitext vergleichen wir nicht wörtlich\n  vergleichbar++;\n  if (gleich(dc[feld], dO[feld])) treffer++;\n  else unterschiede.push(spalte);\n}\nout.modell_claude = c.modell || '';\nout.modell_ollama = o.modell || '';\nout.dauer_claude_s = c.dauer_s ?? null;\nout.dauer_ollama_s = o.dauer_s ?? null;\nout.uebereinstimmung = `${treffer}/${vergleichbar} Felder gleich`;\nout.unterschiede = unterschiede.join(', ');\nout.fehler = [c.ok ? '' : `Claude: ${c.fehler || 'keine Antwort'}`, o.ok ? '' : `Ollama: ${o.fehler || 'keine Antwort'}`].filter(Boolean).join(' | ');\nout.verglichen_am = new Date().toISOString();\nreturn [{ json: out }];"
+      },
+      "notes": "Ein Feld pro Spalte, links Claude, rechts Ollama.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7524c2ea-b143-4952-9983-2a1ab938033d",
+      "name": "In Tabelle \"vergleich\" speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "vergleich"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Eine Zeile pro verglichener Seite.",
+      "notesInFlow": true
+    },
+    {
+      "id": "055593c3-fbb0-497d-ad6a-c53f8e9e3ef8",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        60
+      ],
+      "parameters": {
+        "jsCode": "// Am \"done\"-Ausgang der Schleife kommen alle gespeicherten Vergleichszeilen an.\nconst zeilen = $input.all().map((i) => i.json);\nconst schnitt = (f) => {\n  const w = zeilen.map((z) => z[f]).filter((x) => typeof x === 'number');\n  return w.length ? Math.round((w.reduce((a, b) => a + b, 0) / w.length) * 10) / 10 : null;\n};\nconst haeufig = {};\nfor (const z of zeilen) for (const u of String(z.unterschiede || '').split(', ').filter(Boolean)) haeufig[u] = (haeufig[u] || 0) + 1;\nreturn [{ json: { verglichen: zeilen.length, sekunden_pro_seite_claude: schnitt('dauer_claude_s'), sekunden_pro_seite_ollama: schnitt('dauer_ollama_s'), unterschiede_nach_feld: haeufig } }];"
+      },
+      "notes": "Durchschnittliche Laufzeit + wo sich die Modelle am häufigsten unterscheiden.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Vergleich-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Vergleich-Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Stellen mit Cache laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stellen mit Cache laden": {
+      "main": [
+        [
+          {
+            "node": "Auswahl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auswahl": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seitentext aus Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seitentext aus Cache": {
+      "main": [
+        [
+          {
+            "node": "Extraktions-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraktions-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Zwei Anfragen bauen (Claude + Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zwei Anfragen bauen (Claude + Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Beide Modelle fragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Beide Modelle fragen": {
+      "main": [
+        [
+          {
+            "node": "Nebeneinander stellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nebeneinander stellen": {
+      "main": [
+        [
+          {
+            "node": "In Tabelle \"vergleich\" speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Tabelle \"vergleich\" speichern": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Optional: dieselben Seiten durch beide Modelle.",
+  "tags": [],
+  "isArchived": true
+}

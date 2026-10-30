@@ -1,0 +1,617 @@
+{
+  "id": "jaFaktenLesenA02",
+  "name": "1 Sammeln · Schritt 3 · KI liest Fakten",
+  "nodes": [
+    {
+      "id": "5cb574ed-2243-4598-b8da-c1e756ba7bcb",
+      "name": "Notiz 4b2145",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## A2 – Fakten auslesen (Stufe 4–5, aus dem Cache)\nNimmt alle Zeilen mit Status **abgerufen** (von A1) und lässt die KI die Fakten auslesen – **ohne** die Seiten neu zu laden.\n\nDanach sind die Stellen **aktiv / unklar / abgelaufen / zu_alt / duplikat**.\n\n**Nachtlauf mit einem Klick:** Mit `danach_bewertung_starten = true` startet am Ende automatisch **C Bewertung** (alle offenen Stellen, lokal) und danach **C2** (Claude-Zweitmeinung).\n\nNutzt die GPU (qwen3), ca. 15–25 s pro Stelle.",
+        "width": 760,
+        "height": 360,
+        "color": 4
+      }
+    },
+    {
+      "id": "4c05b634-c5bc-46c6-a294-8b0810593376",
+      "name": "Notiz 588f31",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        -330
+      ],
+      "parameters": {
+        "content": "## ⚙️ Hier einstellen\n- `testlimit`: wie viele Stellen pro Lauf (erst 10, dann mehr)\n- `max_alter_tage`: ältere Stellen → `zu_alt`\n- `pause_sekunden`: Pause zwischen zwei Stellen\n- `anbieter_override`: leer lassen = Einstellung aus \"00 KI-Aufruf\"; sonst `claude` oder `ollama`",
+        "width": 470,
+        "height": 230,
+        "color": 3
+      }
+    },
+    {
+      "id": "52ad869d-4790-4825-8d1f-19c1867107eb",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "79e7707a-1ba9-4588-bb0b-187fb96352c3",
+      "name": "⚙️ Testlauf & Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "594f32a8-c13a-4a46-b23a-8457b27e5340",
+              "name": "testlimit",
+              "value": 1000,
+              "type": "number"
+            },
+            {
+              "id": "e4a63574-d318-42c2-a5df-d33762056458",
+              "name": "max_alter_tage",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "ff11d20f-f9bd-4529-a9d5-ef42dba4c391",
+              "name": "pause_sekunden",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "bb6858a3-442b-4024-9a78-d6f64a2a54f8",
+              "name": "anbieter_override",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "3934332b-f147-433f-b1ee-adb35e0aa6f3",
+              "name": "danach_bewertung_starten",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Einstellungen für diesen Lauf.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1afb82c8-4d18-418c-a25d-91073eb0bc15",
+      "name": "Abgerufene Seiten holen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "abgerufen"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": "={{ $json.testlimit }}"
+      },
+      "notes": "Status \"abgerufen\" (Seite liegt im Cache).",
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d1992e8e-eb85-4b37-a2b5-cfd1e724349c",
+      "name": "Einstellungen anhängen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const e = $('⚙️ Testlauf & Einstellungen').first().json;\nreturn $input.all().map((i) => ({\n  json: { ...i.json, mit_sitzung: false, max_alter_tage: e.max_alter_tage, anbieter_override: e.anbieter_override },\n}));"
+      },
+      "notes": "Gibt jeder Stelle die Einstellungen mit.",
+      "notesInFlow": true
+    },
+    {
+      "id": "52f007b2-6cef-4edb-800e-4000d2432339",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "09d46dd8-4cb2-4ba3-b7c9-022f13135930",
+      "name": "02 Stelle verarbeiten",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1220,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaStelleVerarb02"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Stufen 2–5 für diese eine Stelle.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "44ba3321-5124-48f7-89a1-e6bb2d806ba9",
+      "name": "Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        300
+      ],
+      "parameters": {
+        "amount": "={{ $('⚙️ Testlauf & Einstellungen').first().json.pause_sekunden }}",
+        "unit": "seconds"
+      },
+      "notes": "Kurze Pause – schont Webseiten und deine GPU.",
+      "notesInFlow": true,
+      "webhookId": "980c4ac7-1855-42ed-baf7-ba78a99491b5"
+    },
+    {
+      "id": "b9518b9a-cba5-415e-b344-476b95f47ef5",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const zaehler = {};\nfor (const i of $input.all()) {\n  const s = i.json.status || (i.json.error ? 'fehler (Workflow)' : 'unbekannt');\n  zaehler[s] = (zaehler[s] || 0) + 1;\n}\nreturn [{ json: { verarbeitet: $input.all().length, nach_status: zaehler, naechster_schritt: 'Tabelle \"jobs\" ansehen, dann Workflow C (Bewertung) starten.' } }];"
+      },
+      "notes": "Wie viele Stellen in welchem Status gelandet sind.",
+      "notesInFlow": true
+    },
+    {
+      "id": "3a172dbc-fd60-4ea5-b19a-effdf823c515",
+      "name": "Start per Kette",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-schritt-3",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Automatischer Start durch den vorherigen Schritt (POST /webhook/kette-schritt-3).",
+      "notesInFlow": true,
+      "webhookId": "2a637b30-c4f2-45e1-a219-314c08c5ec15"
+    },
+    {
+      "id": "b9bb198e-0ff6-430b-b8a5-4eec8a4c866c",
+      "name": "Gibt es Arbeit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c16e988f-eea7-4e3d-b415-53292af1efe0",
+              "leftValue": "={{ !!$json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "false = nichts zu tun → direkt weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c7abb75e-9db4-4d6c-a92c-aa7c8244239e",
+      "name": "Weiter zu Schritt 4?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1460,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "19026119-7117-43ca-bb6b-fb42d4f6f8f3",
+              "leftValue": "={{ $('Start per Kette').isExecuted ? ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) >= 4 : $('⚙️ Testlauf & Einstellungen').first().json.danach_bewertung_starten === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "Nur beim automatischen Lauf (bzw. wenn eingestellt).",
+      "notesInFlow": true
+    },
+    {
+      "id": "7fc49aa7-ea05-4489-9d8c-fc331d995ebb",
+      "name": "Schritt 4 starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        -20
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-schritt-4",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ bis_schritt: ($('Start per Kette').isExecuted ? ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) : 4) }) }}"
+      },
+      "notes": "Gibt den Staffelstab weiter – der nächste Schritt läuft als eigener Lauf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "98f68210-d313-4bdc-b3f9-6e69c89e8eb4",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Schritt%203%20%C2%B7%20KI%20liest%20Fakten",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "25370ba0-87c7-43b2-bca1-33a93a5d1023",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1940,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a3ddacc4-978d-4b7b-8ee2-1cc84e9306d0",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "3c3a7502-e270-4f6b-985f-f9f83ba2a212",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "7b1652db-e891-4d56-8819-5c2df7b58b0a",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('Pause').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Testlauf & Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Testlauf & Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Abgerufene Seiten holen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abgerufene Seiten holen": {
+      "main": [
+        [
+          {
+            "node": "Gibt es Arbeit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Einstellungen anhängen": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "02 Stelle verarbeiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Stelle verarbeiten": {
+      "main": [
+        [
+          {
+            "node": "Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start per Kette": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Testlauf & Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es Arbeit?": {
+      "main": [
+        [
+          {
+            "node": "Einstellungen anhängen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter zu Schritt 4?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zusammenfassung": {
+      "main": [
+        [
+          {
+            "node": "Weiter zu Schritt 4?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter zu Schritt 4?": {
+      "main": [
+        [
+          {
+            "node": "Schritt 4 starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "A2 – Fakten auslesen (Stufe 4–5, aus dem Cache)",
+  "tags": [],
+  "isArchived": false
+}

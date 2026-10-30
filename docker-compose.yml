@@ -1,0 +1,58 @@
+# =====================================================================
+# Job-Agent: n8n + Browser-Dienst (Playwright)
+# Start:   docker compose up -d --build
+# Stopp:   docker compose down          (Daten bleiben erhalten)
+# =====================================================================
+name: jobagent
+
+services:
+  # ---------------------------------------------------------------
+  # n8n – die Workflow-Oberfläche: http://localhost:5678
+  # ---------------------------------------------------------------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.5
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"   # nur von deinem Laptop aus erreichbar
+    environment:
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
+      - TZ=${GENERIC_TIMEZONE:-Europe/Berlin}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}   # verschlüsselt gespeicherte Zugangsdaten (z. B. API-Key)
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168              # alte Ausführungen nach 7 Tagen löschen
+    extra_hosts:
+      - "host.docker.internal:host-gateway"       # so erreicht n8n Ollama unter Windows
+    volumes:
+      - n8n_data:/home/node/.n8n                  # Workflows, Data Tables, Zugangsdaten
+      - ./n8n/workflows:/workflows:ro                 # zum Importieren der Workflow-Dateien
+    depends_on:
+      - browser
+
+  # ---------------------------------------------------------------
+  # Browser-Dienst – Chromium per HTTP: http://localhost:3000
+  # Sichtbarer Browser (noVNC):        http://localhost:6080
+  # ---------------------------------------------------------------
+  browser:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:6080:6080"
+    environment:
+      - HEADLESS=${HEADLESS:-true}                # false = Browser sichtbar in noVNC (zum Debuggen)
+      - MAX_CONCURRENCY=${MAX_CONCURRENCY:-2}     # wie viele Seiten gleichzeitig geladen werden
+      - PAGE_TIMEOUT_MS=${PAGE_TIMEOUT_MS:-45000}
+      - RETRIES=${RETRIES:-2}
+      - PUBLIC_URL=http://localhost:3000
+      - TZ=${GENERIC_TIMEZONE:-Europe/Berlin}
+    volumes:
+      - ./data:/data                              # Cache, Screenshots, Links, Browser-Profil
+      - ./n8n/prompts:/prompts:ro                     # Prompt-Dateien (hier editierbar)
+    shm_size: "1gb"                               # Chromium braucht gemeinsamen Speicher
+
+volumes:
+  n8n_data:

@@ -1,0 +1,542 @@
+{
+  "id": "jaLinksEinlesen1",
+  "name": "1 Sammeln · Schritt 1 · Links von Missionfrei holen",
+  "nodes": [
+    {
+      "id": "d7168b27-c73b-40ad-81c1-988b72171cbb",
+      "name": "Notiz 383ae8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## 01 – Links einlesen (Stufe 1)\n**Vorher:** http://localhost:3000 öffnen → Schritt 1 „Seite öffnen\" → Schritt 2 „Sichtbaren Browser anzeigen\" → Missionfrei-Passwort **selbst** eingeben. Seite offen lassen.\n\n**Ohne Entsperren:** im Knoten ⚙️ Quelle `gespeicherte_liste_nutzen = true` setzen → nimmt die zuletzt gelesene Linkliste.\n\nDann hier \"Execute workflow\":\n1. Der Browser-Dienst liest alle Links der entsperrten Seite.\n2. Links werden vereinheitlicht (Tracking-Anhänge weg, https), Duplikate entfernt.\n3. **Abgleich** mit der Tabelle: Nur **neue** Links werden als Status `neu` angelegt. Bekannte bleiben unangetastet.\n4. Links, die nicht mehr auf der Seite stehen, bekommen `nicht_mehr_gelistet = true`.\n\nBeliebig oft startbar – es entsteht keine doppelte Arbeit.",
+        "width": 720,
+        "height": 380,
+        "color": 4
+      }
+    },
+    {
+      "id": "2a096f2a-3a61-46b6-adba-2cce7fa22986",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "693b36a8-0cb9-4009-a8a5-09cc78f9ac7f",
+      "name": "⚙️ Quelle",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "904a4f3f-4ba4-4b1c-b44d-24f186d3d3e0",
+              "name": "quelle_url",
+              "value": "https://missionfrei.github.io/remote/",
+              "type": "string"
+            },
+            {
+              "id": "f3641f84-bafe-43aa-b77d-5d63f0cfa182",
+              "name": "gespeicherte_liste_nutzen",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "gespeicherte_liste_nutzen = true: nimmt die zuletzt gelesene Linkliste (ohne Entsperren).",
+      "notesInFlow": true
+    },
+    {
+      "id": "230bece6-228f-4f6a-913a-940b8e3cfadc",
+      "name": "Gespeicherte Liste nutzen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e3df015a-cbba-424c-90cf-92dd040a2140",
+              "leftValue": "={{ $json.gespeicherte_liste_nutzen === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = Datei data/links/links-latest.json statt Live-Seite.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a370815f-54df-4267-b404-23893d6d38cf",
+      "name": "Gespeicherte Linkliste laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        480
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/links/latest",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Zuletzt gelesene Liste (siehe gelesenAm).",
+      "notesInFlow": true
+    },
+    {
+      "id": "18bcf285-d176-4d1e-9fca-a0ac053be1bf",
+      "name": "Links von der Seite lesen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/extract-links",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.quelle_url, fallbackGespeichert: true }) }}"
+      },
+      "notes": "Nimmt die schon offene (entsperrte) Seite aus dem Browser-Dienst.",
+      "notesInFlow": true
+    },
+    {
+      "id": "89065f39-9890-48f4-9be1-321035a9c138",
+      "name": "Gesperrt?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (!r.ok) {\n  // Klare Fehlermeldung statt leerer Tabelle\n  throw new Error(r.hinweis || r.error || 'Links konnten nicht gelesen werden');\n}\nreturn [{ json: r }];"
+      },
+      "notes": "Bricht mit einer klaren Meldung ab, falls die Seite noch gesperrt ist.",
+      "notesInFlow": true
+    },
+    {
+      "id": "190cc4f6-0a32-4a77-8cc1-b27e420ebaee",
+      "name": "Vorhandene Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Alle Zeilen der Tabelle \"jobs\" – für den Abgleich.",
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ad281d14-60a7-49c5-86c3-47a3cc4f2966",
+      "name": "Abgleich: was ist neu?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const quelle = $('Gesperrt?').first().json;\nconst vorhanden = $input.all().map((i) => i.json).filter((r) => r && r.url);\n\n// Links, die sicher KEINE Stellen sind (eigene Seite, Messenger, Social Media ...)\nconst AUSSCHLUSS = ['missionfrei', 'wa.me', 'whatsapp.com', 'instagram.com', 'facebook.com', 'youtube.com', 'youtu.be', 'tiktok.com', 't.me/', 'calendly.com', 'paypal.', 'linktr.ee', 'googleadservices.', 'doubleclick.net', 'googlesyndication.'];\n\n// Hinweis: Im n8n-Code-Knoten gibt es kein \"new URL(...)\".\n// Deshalb zerlegen wir Adressen mit einem regulären Ausdruck selbst.\nfunction zerlegeUrl(roh) {\n  const m = String(roh || '').trim().match(/^(https?):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i);\n  if (!m) return null;\n  return { protokoll: m[1].toLowerCase(), host: m[2].toLowerCase(), pfad: m[3] || '/', query: m[4] || '' };\n}\n\n// Macht aus einer relativen Weiterleitung (\"/karriere\") eine volle Adresse.\nfunction absoluteUrl(ziel, basis) {\n  if (/^https?:\\/\\//i.test(ziel)) return ziel;\n  const b = zerlegeUrl(basis);\n  if (!b) return ziel;\n  if (ziel.startsWith('//')) return b.protokoll + ':' + ziel;\n  if (ziel.startsWith('/')) return b.protokoll + '://' + b.host + ziel;\n  return b.protokoll + '://' + b.host + b.pfad.replace(/[^\\/]*$/, '') + ziel;\n}\n\n// Zeigt eine Adresse nur noch auf eine allgemeine Karriere- oder Startseite?\nfunction istAllgemeineSeite(ziel, original) {\n  const z = zerlegeUrl(ziel);\n  const o = zerlegeUrl(original);\n  if (!z || !o) return false;\n  const pfad = (u) => u.pfad.replace(/\\/+$/, '').toLowerCase();\n  const host = (u) => u.host.replace(/^www\\./, '');\n  if (host(z) === host(o) && pfad(z) === pfad(o)) return false; // z. B. nur http -> https\n  const p = pfad(z);\n  if (p === '') return true;\n  if (/^(\\/[a-z]{2}(-[a-z]{2})?)?(\\/(karriere|career|careers|jobs|job|stellenangebote|stellen|offene-stellen|jobboerse|join-us|joinus|vacancies|work-with-us|search|suche))*$/.test(p)) return true;\n  if (/[?&](error|expired|notfound|jobnotfound)=/i.test(z.query)) return true;\n  return false;\n}\n\n// Vereinheitlichen, damit gleiche Links auch gleich aussehen:\n// immer https, ohne #Anker, ohne Tracking-Parameter (utm_..., gclid ...), ohne \"/\" am Ende.\nfunction normalisiere(roh) {\n  const u = zerlegeUrl(roh);\n  if (!u) return null;\n  const params = u.query\n    .replace(/^\\?/, '')\n    .split('&')\n    .filter(Boolean)\n    .filter((p) => !/^(utm_|gclid|fbclid|mc_|ref=|ref_|source=|trk|trackingid|_hs|hsa_)/i.test(p));\n  let pfad = u.pfad || '/';\n  if (pfad !== '/' && params.length === 0) pfad = pfad.replace(/\\/+$/, '') || '/';\n  return `https://${u.host}${pfad}${params.length ? '?' + params.join('&') : ''}`;\n}\n\nconst gesehen = new Map();\nfor (const l of quelle.links || []) {\n  const url = normalisiere(l.url);\n  if (!url) continue;\n  if (AUSSCHLUSS.some((a) => url.includes(a))) continue;\n  if (!gesehen.has(url)) gesehen.set(url, l.text || '');\n}\n\nconst bekannt = new Set(vorhanden.map((r) => r.url));\nconst jetzt = new Date().toISOString();\nconst neue_zeilen = [];\nfor (const [url, text] of gesehen) {\n  if (bekannt.has(url)) continue;\n  neue_zeilen.push({\n    url,\n    domain: zerlegeUrl(url).host.replace(/^www\\./, ''),\n    linktext: text,\n    erstmals_gesehen: jetzt,\n    nicht_mehr_gelistet: false,\n    status: 'neu',\n    freigabe: '',\n  });\n}\n\n// Nur Zeilen anfassen, deren \"gelistet\"-Markierung sich ändert.\nconst markierungen = [];\nfor (const r of vorhanden) {\n  if (String(r.linktext || '').startsWith('(manuell')) continue; // von dir hinzugefügt – nicht auf Missionfrei\n  const gelistet = gesehen.has(r.url);\n  if (Boolean(r.nicht_mehr_gelistet) === gelistet) markierungen.push({ id: r.id, nicht_mehr_gelistet: !gelistet });\n}\n\nreturn [\n  {\n    json: {\n      quelle: quelle.ausDatei ? quelle.hinweis : 'live von der Seite gelesen',\n      links_auf_der_seite: quelle.count,\n      eindeutige_stellenlinks: gesehen.size,\n      neu: neue_zeilen.length,\n      schon_bekannt: gesehen.size - neue_zeilen.length,\n      geaenderte_markierungen: markierungen.length,\n      neue_zeilen,\n      markierungen,\n    },\n  },\n];"
+      },
+      "notes": "Hier siehst du die Zusammenfassung: gefunden / neu / schon bekannt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "092adf57-cc39-4c8d-8c71-bfa808af7b52",
+      "name": "Neue Zeilen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        120
+      ],
+      "parameters": {
+        "jsCode": "return $input.first().json.neue_zeilen.map((r) => ({ json: r }));"
+      },
+      "notes": "Eine Zeile pro neuem Link.",
+      "notesInFlow": true
+    },
+    {
+      "id": "8e185f19-67c9-4c1a-bdf9-cb5920830356",
+      "name": "Neue Links eintragen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Status \"neu\" – Workflow A holt sie sich.",
+      "notesInFlow": true
+    },
+    {
+      "id": "bfdfa862-0288-4766-86a4-df1129853698",
+      "name": "Geänderte Markierungen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        320
+      ],
+      "parameters": {
+        "jsCode": "return $input.first().json.markierungen.map((r) => ({ json: r }));"
+      },
+      "notes": "Links, die verschwunden oder wieder aufgetaucht sind.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7fc17f3b-d9f2-43a6-9101-e88ff6c5c3fe",
+      "name": "Markierung speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        320
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Setzt nicht_mehr_gelistet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f4ef1110-317f-44e3-8ca9-5e84884d3d98",
+      "name": "Start per Kette",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-schritt-1",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Automatischer Start durch den vorherigen Schritt (POST /webhook/kette-schritt-1).",
+      "notesInFlow": true,
+      "webhookId": "056e32db-b429-4e86-abaa-ac37a5f14704"
+    },
+    {
+      "id": "fae87f91-5cbd-4efb-82c2-396ab34a5c96",
+      "name": "Weiter zu Schritt 2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        540
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2ddffcca-2668-4ab4-854a-7a7941308947",
+              "leftValue": "={{ ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) >= 2 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "Nur beim automatischen Lauf (bzw. wenn eingestellt).",
+      "notesInFlow": true
+    },
+    {
+      "id": "5ce7191e-15e1-4017-a2bb-cbc740a5fce5",
+      "name": "Schritt 2 starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-schritt-2",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ bis_schritt: ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) }) }}"
+      },
+      "notes": "Gibt den Staffelstab weiter – der nächste Schritt läuft als eigener Lauf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Start per Kette": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Quelle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abgleich: was ist neu?": {
+      "main": [
+        [
+          {
+            "node": "Weiter zu Schritt 2?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Neue Zeilen",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Geänderte Markierungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter zu Schritt 2?": {
+      "main": [
+        [
+          {
+            "node": "Schritt 2 starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Quelle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Quelle": {
+      "main": [
+        [
+          {
+            "node": "Gespeicherte Liste nutzen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gespeicherte Liste nutzen?": {
+      "main": [
+        [
+          {
+            "node": "Gespeicherte Linkliste laden",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Links von der Seite lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gespeicherte Linkliste laden": {
+      "main": [
+        [
+          {
+            "node": "Gesperrt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Links von der Seite lesen": {
+      "main": [
+        [
+          {
+            "node": "Gesperrt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gesperrt?": {
+      "main": [
+        [
+          {
+            "node": "Vorhandene Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vorhandene Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Abgleich: was ist neu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Neue Zeilen": {
+      "main": [
+        [
+          {
+            "node": "Neue Links eintragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Geänderte Markierungen": {
+      "main": [
+        [
+          {
+            "node": "Markierung speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Stufe 1: Links von Missionfrei lesen, nur neue in die Tabelle.",
+  "tags": [],
+  "isArchived": false
+}

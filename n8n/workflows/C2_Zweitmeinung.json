@@ -1,0 +1,551 @@
+{
+  "id": "jaZweitmeinungC2",
+  "name": "1 Sammeln · Schritt 4b · KI-Zweitmeinung (Score ≥ 3)",
+  "nodes": [
+    {
+      "id": "586d8c49-5a23-4974-a0f4-103be3443c5c",
+      "name": "Notiz 1204e0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## C2 – Zweitmeinung (Hybrid)\nWird von **Schritt 4** automatisch gestartet (Staffellauf), nachdem das lokale Modell alle Stellen bewertet hat.\n\nNur Stellen mit lokalem Score **≥ zweitmeinung_ab_score** (Standard 3) werden noch einmal mit dem stärkeren Modell bewertet (Standard: **Claude Sonnet 5.5**), höchstens **zweitmeinung_max_stellen** (Standard 100 ≈ 2–3 $).\n\nDie Einstellungen stehen in **C → 📝 Meine Kriterien**. Die alte lokale Note bleibt als `[Vorher lokal: X]` in der Begründung sichtbar.",
+        "width": 760,
+        "height": 300,
+        "color": 4
+      }
+    },
+    {
+      "id": "65342979-adf6-40f3-8601-d4b220b10cc4",
+      "name": "Start per Kette",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-zweitmeinung",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Automatischer Start durch den vorherigen Schritt (POST /webhook/kette-zweitmeinung).",
+      "notesInFlow": true,
+      "webhookId": "dc400170-b83c-4267-8fa3-8d5b0ca81a41"
+    },
+    {
+      "id": "c69d25cb-3d6a-40c7-aa63-a0da883607cf",
+      "name": "Bewertete Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "aktiv"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "unklar"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Aktive Stellen inkl. lokaler Bewertung.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c6632bb4-c110-4236-a807-271894ec3de9",
+      "name": "Kandidaten auswählen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const k = $('Start per Kette').first().json.body;\nconst ab = Number(k.zweitmeinung_ab_score || 3);\nconst max = Number(k.zweitmeinung_max_stellen || 100);\n// Nur lokal bewertete Stellen mit gutem Score – Claude-Bewertungen werden nicht doppelt bezahlt.\nreturn $input\n  .all()\n  .map((i) => i.json)\n  .filter((r) => r.id && Number(r.passung_score) >= ab && /^(ollama|claude):/.test(String(r.modell_bewertung || '')) && !String(r.modell_bewertung).includes(k.zweitmeinung_modell || 'claude-sonnet-5-5') && !r.duplikat_von)\n  .sort((a, b) => b.passung_score - a.passung_score)\n  .slice(0, max)\n  .map((r) => ({ json: { ...r, _direkt: false } }));"
+      },
+      "notes": "Score ≥ Schwelle, bisher nur lokal bewertet, höchstens max_stellen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b11cc9dc-81ea-4315-8ec5-e7279e0537fe",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f0509641-759a-4774-9d93-6d99f2258cd6",
+      "name": "Seitentext aus Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Gespeicherter Text – kein neuer Abruf der Webseite.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "84c1e6d7-4ca1-4335-bb4a-460d25f73e88",
+      "name": "Bewertungs-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/bewertung.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/bewertung.md",
+      "notesInFlow": true
+    },
+    {
+      "id": "d760f204-70ba-435f-8604-575fc4984046",
+      "name": "Bewertungs-Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: eine Stelle nach der anderen').first().json;\nconst cache = $('Seitentext aus Cache').first().json;\nconst k = $('Start per Kette').first().json.body;\n\nconst vorlage = String($json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, key) => (key in werte ? werte[key] : m));\n\nconst fakten = [\n  `Jobtitel: ${row.jobtitel || '-'}`,\n  `Firma: ${row.firma || '-'}`,\n  `Ort: ${row.ort || '-'}`,\n  `Remote: ${row.remote || '-'}`,\n  `Remote-Regel (wörtlich): ${row.remote_regel_wortlaut || '-'}`,\n  `Gehalt: ${row.gehalt || '-'}`,\n  `Vertragsform: ${row.vertragsform || '-'}`,\n  `Bewerbungsweg: ${row.bewerbungsweg || '-'}`,\n  `Veröffentlicht: ${row.veroeffentlichungsdatum || 'unbekannt'}`,\n  `Zusammenfassung: ${row.kurze_zusammenfassung || '-'}`,\n].join('\\n');\n\n// ---- Signalwort-Check per Code (findet zuverlässig, erfindet nichts) ----\nconst seitentext = cache && cache.ok ? String(cache.text) : '';\nconst suchtext = (seitentext + '\\n' + (row.remote_regel_wortlaut || '')).toLowerCase();\nconst finde = (liste) =>\n  String(liste || '')\n    .split(',')\n    .map((w) => w.trim().toLowerCase())\n    .filter((w) => w && suchtext.includes(w));\nconst plus = finde(k.signal_plus);\nconst minus = finde(k.signal_minus);\nconst signale =\n  `Automatisch im Anzeigentext gefundene Signalwörter zum Arbeitsort:\\n` +\n  `- Plus: ${plus.length ? plus.join(', ') : 'keine'}\\n` +\n  `- Minus: ${minus.length ? minus.join(', ') : 'keine'}\\n` +\n  `(Prüfe im Text, in welchem Zusammenhang sie stehen – z. B. kann \"hybrid\" auch \"nicht hybrid\" heißen.)`;\n\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['passung_score', 'pflichtkriterien_erfuellt', 'begruendung', 'luecken', 'offene_fragen', 'warnsignale', 'dev_skills_nutzen', 'dev_skills_wie'],\n  properties: {\n    dev_skills_nutzen: { type: 'string', enum: ['hoch', 'mittel', 'gering', 'keiner'] },\n    dev_skills_wie: { type: 'string', description: 'Welche Entwickler-Skills konkret wofür helfen' },\n    passung_score: { type: 'integer', description: '1 (passt nicht) bis 5 (passt sehr gut)' },\n    pflichtkriterien_erfuellt: { type: 'string', enum: ['ja', 'nein', 'unklar'] },\n    begruendung: { type: 'string' },\n    luecken: { type: 'string' },\n    offene_fragen: { type: 'string' },\n    warnsignale: { type: 'string' },\n  },\n};\n\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, { HEUTE: $now.toFormat('yyyy-MM-dd'), KRITERIEN: k.kriterien, FAKTEN: fakten + '\\n\\n' + signale, URL: row.url, SEITENTEXT: '{{SEITENTEXT}}' }),\n      seitentext: seitentext || '(kein Seitentext im Cache – nur Fakten verwenden)',\n      schema: SCHEMA,\n      anbieter_override: k.anbieter_override || '',\n      funktion: k.funktion_override || 'bewertung', // Modell laut Einstellungen\n      claude_modell_override: k.claude_modell_override || '',\n      claude_effort_override: k.claude_effort_override || '',\n      ollama_denken_override: k.ollama_denken_override || '',\n      kontext: {\n        id: row.id,\n        signale_plus: plus.join(', '),\n        signale_minus: minus.join(', '),\n        vorher_score: row.passung_score || null,\n        vorher_modell: row.modell_bewertung || '',\n      },\n    },\n  },\n];"
+      },
+      "notes": "Kriterien + Fakten + Seitentext + JSON-Schema.",
+      "notesInFlow": true
+    },
+    {
+      "id": "263dd56a-20b2-4e30-a3fc-2927a491fb60",
+      "name": "Zweitmeinung: KI-Bewertung",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "fd7ee27a-a4fc-4093-b839-f6b1f1e40af8",
+      "name": "Bewertung aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nconst jetzt = new Date().toISOString();\nif (r._direkt) {\n  return [{ json: { id: r.id, passung_score: 1, bewertung: 'passt nicht', bewertung_begruendung: r._grund, pflichtkriterien_erfuellt: '', luecken: '', offene_fragen: '', warnsignale: '', modell_bewertung: 'regel', bewertet_am: jetzt } }];\n}\nconst modell = `${r.anbieter || '?'}:${r.modell || '?'}`;\nif (!r.ok && r.kontext && r.kontext.vorher_score) {\n  // Zweitmeinung fehlgeschlagen (z. B. Netzwerk, Guthaben leer): alte Bewertung behalten.\n  return [{ json: { id: r.kontext.id, modell_bewertung: r.kontext.vorher_modell } }];\n}\nif (!r.ok) {\n  return [{ json: { id: r.kontext && r.kontext.id, bewertung: 'fehler', bewertung_begruendung: 'KI-Fehler: ' + (r.fehler || 'keine Antwort'), modell_bewertung: modell, bewertet_am: jetzt } }];\n}\nconst d = r.daten;\nlet score = Math.round(Number(d.passung_score));\nif (!Number.isFinite(score)) score = 3;\nscore = Math.min(5, Math.max(1, score));\nconst bewertung = score >= 4 ? 'passt gut' : score === 3 ? 'passt teilweise' : 'passt nicht';\nreturn [\n  {\n    json: {\n      id: r.kontext.id,\n      passung_score: score,\n      bewertung,\n      // Zusatzinfos als [Markierungen] am Ende – die Ergebnis-Seite zeigt sie als eigene Felder an.\n      bewertung_begruendung:\n        String(d.begruendung || '') +\n        ` [Dev-Skills: ${d.dev_skills_nutzen || '?'}${d.dev_skills_wie ? ' – ' + d.dev_skills_wie : ''}]` +\n        ` [Signalwörter + ${r.kontext.signale_plus || '–'} | − ${r.kontext.signale_minus || '–'}]` +\n        // Bei einer Zweitmeinung: vorherige lokale Bewertung festhalten (zum Vergleichen)\n        (r.anbieter === 'claude' && /^(ollama|claude):/.test(String(r.kontext.vorher_modell || '')) && String(r.kontext.vorher_modell) !== `claude:${r.modell}` && r.kontext.vorher_score\n          ? ` [Vorher ${String(r.kontext.vorher_modell).startsWith('ollama') ? 'lokal' : 'Haiku'}: ${r.kontext.vorher_score}]`\n          : ''),\n      pflichtkriterien_erfuellt: String(d.pflichtkriterien_erfuellt || ''),\n      luecken: String(d.luecken || ''),\n      offene_fragen: String(d.offene_fragen || ''),\n      warnsignale: String(d.warnsignale || ''),\n      modell_bewertung: modell,\n      bewertet_am: jetzt,\n    },\n  },\n];"
+      },
+      "notes": "Score 4–5 = passt gut, 3 = teilweise, 1–2 = passt nicht.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7803d4d7-57ca-4393-a4ca-df5f87c5cc28",
+      "name": "Bewertung speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Schreibt die Bewertung in die Zeile.",
+      "notesInFlow": true
+    },
+    {
+      "id": "9fe70759-9d5b-4147-b08a-866c8634e22c",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const z = {};\nfor (const i of $input.all()) z[i.json.bewertung || 'ohne'] = (z[i.json.bewertung || 'ohne'] || 0) + 1;\nreturn [{ json: { bewertet: $input.all().length, ergebnis: z, tipp: 'Ergebnis-Seite: http://localhost:3000/ergebnisse' } }];"
+      },
+      "notes": "Wie viele passen gut / teilweise / nicht.",
+      "notesInFlow": true
+    },
+    {
+      "id": "219f9d3b-76ae-46bd-bd9c-3a609d8d5775",
+      "name": "Einordnung starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        60
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-einordnung",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}"
+      },
+      "notes": "Danach: neue/geänderte Bewertungen für die Auswertung einordnen (Workflow F).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ef494ef2-a47e-43bf-b5a0-d77cb3756112",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Schritt%204%20%C2%B7%20Claude-Zweitmeinung",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "3c47616d-3986-42fe-8d1c-997e669c744b",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e8425f02-8c81-4b1f-8045-bce9c268a9dc",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a8aa3a61-4d1a-4f9f-95b0-585a9fa606fd",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "bbcb8187-dde7-4744-8cd9-79fcfa7163e8",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('Bewertung speichern').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Start per Kette": {
+      "main": [
+        [
+          {
+            "node": "Bewertete Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertete Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Kandidaten auswählen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kandidaten auswählen": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seitentext aus Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zusammenfassung": {
+      "main": [
+        [
+          {
+            "node": "Einordnung starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seitentext aus Cache": {
+      "main": [
+        [
+          {
+            "node": "Bewertungs-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertungs-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Bewertungs-Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertungs-Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "Zweitmeinung: KI-Bewertung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zweitmeinung: KI-Bewertung": {
+      "main": [
+        [
+          {
+            "node": "Bewertung aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertung aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Bewertung speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertung speichern": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Zweite Bewertung der besten Kandidaten mit Claude.",
+  "tags": [],
+  "isArchived": false
+}

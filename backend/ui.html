@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job-Agent Browser</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#deded8; --accent:#2f5d50; --ok:#2f7d4f; --warn:#a15c00; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --fg:#ececea; --muted:#a3a39d; --card:#20201f; --line:#34342f; --accent:#7fb8a6; --ok:#7fc79a; --warn:#e0a85c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin:14px 0; }
+  .step { display:flex; gap:14px; }
+  .num { flex:0 0 30px; height:30px; border-radius:50%; background:var(--accent); color:var(--card); display:grid; place-items:center; font-weight:600; }
+  .step h2 { margin:2px 0 6px; font-size:1.05rem; }
+  .step p { margin:4px 0; }
+  input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  button, a.btn { display:inline-block; margin:8px 8px 0 0; padding:8px 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:var(--card); cursor:pointer; text-decoration:none; font:inherit; }
+  button.ghost { background:transparent; color:var(--accent); }
+  button.small { padding:3px 10px; margin:0; font-size:.85rem; }
+  small, .muted { color:var(--muted); }
+  .status { font-weight:600; }
+  .status.on { color:var(--warn); } .status.off { color:var(--ok); }
+  ul.tabs { list-style:none; padding:0; margin:8px 0 0; }
+  ul.tabs li { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--line); }
+  ul.tabs li span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  #msg { min-height:1.5em; color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Job-Agent Browser</h1>
+  <p><a class="btn" href="/ergebnisse">📋 Zu meinen Stellen (Ergebnis-Seite)</a></p>
+  <p class="sub">Hier steuerst du den Chromium-Browser, mit dem n8n die Stellenseiten abruft.
+  Normalerweise arbeitet er <b>unsichtbar</b>. Nur zum Anmelden machst du ihn kurz <b>sichtbar</b>.</p>
+
+  <div class="card">
+    Browser-Modus: <span id="mode" class="status">…</span>
+    <div class="muted" id="modeHint"></div>
+  </div>
+
+  <div class="card step">
+    <div class="num">1</div>
+    <div>
+      <h2>Seite im sichtbaren Browser öffnen</h2>
+      <p class="muted">Für das Missionfrei-Passwort oder den Login auf einer Jobseite. Ist die Seite schon offen, wird kein neuer Tab geöffnet.</p>
+      <input id="url" value="https://missionfrei.github.io/remote/">
+      <button onclick="openUrl()">Seite öffnen</button>
+    </div>
+  </div>
+
+  <div class="card step">
+    <div class="num">2</div>
+    <div>
+      <h2>Im sichtbaren Browser anmelden</h2>
+      <p class="muted">Öffnet den Browser in einem neuen Fenster (noVNC). Dort Passwort bzw. Login <b>selbst</b> eingeben.
+      Logins bleiben im Browser-Profil gespeichert.</p>
+      <a class="btn" href="__NOVNC_URL__" target="_blank" rel="noopener">Sichtbaren Browser anzeigen</a>
+    </div>
+  </div>
+
+  <div class="card step">
+    <div class="num">3</div>
+    <div>
+      <h2>Workflow in n8n starten</h2>
+      <p class="muted">Missionfrei: Workflow <b>01 Links einlesen</b>. Logins für Jobseiten: Workflow <b>B Freigaben verarbeiten</b>.
+      Die geöffnete Seite dabei offen lassen.</p>
+      <a class="btn" href="http://localhost:5678" target="_blank" rel="noopener">n8n öffnen</a>
+    </div>
+  </div>
+
+  <div class="card step">
+    <div class="num">4</div>
+    <div>
+      <h2>Zurück auf unsichtbar</h2>
+      <p class="muted">Wenn du fertig bist. Der Browser startet dann neu und lädt Seiten schneller. Gespeicherte Logins bleiben erhalten.</p>
+      <button class="ghost" onclick="setMode(false)">Unsichtbar schalten</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0;font-size:1.05rem">Offene Tabs</h2>
+    <p class="muted" style="margin:4px 0 0">Was der Browser gerade geöffnet hat. Überflüssige Tabs kannst du hier schließen.</p>
+    <ul class="tabs" id="tabs"></ul>
+  </div>
+
+  <p id="msg"></p>
+</main>
+<script>
+async function call(path, body) {
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  return r.json();
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+async function refresh() {
+  try {
+    const t = await call('/tabs');
+    const m = document.getElementById('mode');
+    m.textContent = t.visible ? 'sichtbar' : 'unsichtbar';
+    m.className = 'status ' + (t.visible ? 'on' : 'off');
+    document.getElementById('modeHint').textContent = t.visible
+      ? 'Du kannst den Browser über „Sichtbaren Browser anzeigen“ bedienen.'
+      : 'Normalbetrieb. Zum Anmelden Schritt 1 ausführen.';
+    const ul = document.getElementById('tabs');
+    ul.innerHTML = t.tabs.length ? '' : '<li><span class="muted">keine</span></li>';
+    for (const tab of t.tabs) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span title="' + esc(tab.url) + '">' + esc(tab.title || tab.url) + '</span>';
+      const b = document.createElement('button');
+      b.className = 'ghost small'; b.textContent = 'schließen';
+      b.onclick = async () => { await call('/tabs/close', { index: tab.index }); refresh(); };
+      li.appendChild(b); ul.appendChild(li);
+    }
+  } catch (e) { document.getElementById('mode').textContent = 'nicht erreichbar'; }
+}
+async function openUrl() {
+  document.getElementById('msg').textContent = 'Öffne …';
+  const j = await call('/open', { url: document.getElementById('url').value });
+  document.getElementById('msg').textContent = j.hinweis || j.error || '';
+  refresh();
+}
+async function setMode(v) {
+  document.getElementById('msg').textContent = 'Starte Browser neu …';
+  await call('/mode', { visible: v });
+  document.getElementById('msg').textContent = '';
+  refresh();
+}
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>

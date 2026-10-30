@@ -1,0 +1,315 @@
+{
+  "id": "jaPruefenA00001A",
+  "name": "Archiv · Stellen prüfen alles-in-einem (alt)",
+  "nodes": [
+    {
+      "id": "7e2a8a62-00a7-47bd-8377-b104ce5c66ca",
+      "name": "Notiz 85d66d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## A – Stellen prüfen (Stufen 2–5)\nNimmt Zeilen mit Status **neu** aus der Tabelle **jobs** und schickt sie einzeln durch **02 Stelle verarbeiten**.\n\n- **Erster Testlauf:** `testlimit = 10` lassen.\n- Danach z. B. 50, dann 1000 (= alle).\n- Problemfälle (Login, Captcha) landen als **wartet_auf_freigabe** in der Tabelle → später Workflow **B**.\n\n**Parallelität:** bewusst eine Stelle nach der anderen. Der Engpass ist die KI auf deiner GPU; der Browser-Dienst begrenzt zusätzlich auf `MAX_CONCURRENCY`.",
+        "width": 760,
+        "height": 360,
+        "color": 4
+      }
+    },
+    {
+      "id": "4a0ba297-9eb9-420d-b2c4-d391a46ccc6f",
+      "name": "Notiz 212233",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        -330
+      ],
+      "parameters": {
+        "content": "## ⚙️ Hier einstellen\n- `testlimit`: wie viele Stellen pro Lauf (erst 10, dann mehr)\n- `max_alter_tage`: ältere Stellen → `zu_alt`\n- `pause_sekunden`: Pause zwischen zwei Stellen\n- `anbieter_override`: leer lassen = Einstellung aus \"00 KI-Aufruf\"; sonst `claude` oder `ollama`",
+        "width": 470,
+        "height": 230,
+        "color": 3
+      }
+    },
+    {
+      "id": "2d4673fc-bfc1-48a9-9388-80c317408684",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "51fa3b82-5cdc-4a6d-ab8c-98ca9ecec5a9",
+      "name": "⚙️ Testlauf & Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dc57a550-e352-46ca-b1b2-84cc29a31a78",
+              "name": "testlimit",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "9defd128-5966-446b-a3a9-5291df489149",
+              "name": "max_alter_tage",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "9bbe2d5f-aa34-493b-a963-478626888f1c",
+              "name": "pause_sekunden",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "271afab8-f8e5-468b-ad6c-1e16c115e947",
+              "name": "anbieter_override",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Einstellungen für diesen Lauf.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c93e7847-c0de-4ed7-b1ac-44950e8b7e03",
+      "name": "Neue Links holen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "neu"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": "={{ $json.testlimit }}"
+      },
+      "notes": "Höchstens \"testlimit\" Zeilen mit Status \"neu\".",
+      "notesInFlow": true
+    },
+    {
+      "id": "c57bfec3-3cee-499d-8cae-78d1b5e2dec1",
+      "name": "Einstellungen anhängen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const e = $('⚙️ Testlauf & Einstellungen').first().json;\nreturn $input.all().map((i) => ({\n  json: { ...i.json, mit_sitzung: false, max_alter_tage: e.max_alter_tage, anbieter_override: e.anbieter_override },\n}));"
+      },
+      "notes": "Gibt jeder Stelle die Einstellungen mit.",
+      "notesInFlow": true
+    },
+    {
+      "id": "5bfa721d-495d-48a1-9321-a64523d61a07",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "92ba9baa-92c0-4df3-ba99-380ffe03dacb",
+      "name": "02 Stelle verarbeiten",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1220,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaStelleVerarb02"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Stufen 2–5 für diese eine Stelle.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c6d64a32-16a2-468d-bc01-a0e9c5f3addc",
+      "name": "Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        300
+      ],
+      "parameters": {
+        "amount": "={{ $('⚙️ Testlauf & Einstellungen').first().json.pause_sekunden }}",
+        "unit": "seconds"
+      },
+      "notes": "Kurze Pause – schont Webseiten und deine GPU.",
+      "notesInFlow": true,
+      "webhookId": "12521067-fffe-49ee-bb51-db971781f1f9"
+    },
+    {
+      "id": "6db329d7-87a6-41b3-8dd2-144860319b8a",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const zaehler = {};\nfor (const i of $input.all()) {\n  const s = i.json.status || (i.json.error ? 'fehler (Workflow)' : 'unbekannt');\n  zaehler[s] = (zaehler[s] || 0) + 1;\n}\nreturn [{ json: { verarbeitet: $input.all().length, nach_status: zaehler, naechster_schritt: 'Tabelle \"jobs\" ansehen, dann Workflow C (Bewertung) starten.' } }];"
+      },
+      "notes": "Wie viele Stellen in welchem Status gelandet sind.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Testlauf & Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Testlauf & Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Neue Links holen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Neue Links holen": {
+      "main": [
+        [
+          {
+            "node": "Einstellungen anhängen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Einstellungen anhängen": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "02 Stelle verarbeiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Stelle verarbeiten": {
+      "main": [
+        [
+          {
+            "node": "Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "A – Stellen prüfen (Stufen 2–5)",
+  "tags": [],
+  "isArchived": true
+}

@@ -1,0 +1,705 @@
+{
+  "id": "jaTiefencheckG01",
+  "name": "3 Prüfen · Tiefen-Check (auf Knopfdruck)",
+  "nodes": [
+    {
+      "id": "0a132b21-bab7-43e8-b543-8dce8eead6f6",
+      "name": "Notiz 5c5330",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -380
+      ],
+      "parameters": {
+        "content": "## G – Tiefen-Check deiner Favoriten\nStart per Knopf **🔍 Tiefen-Check** auf einer Karte (Tab 3 · Prüfen) – nie automatisch, weil es pro Stelle ein paar Cent kostet.\n\nDie KI bekommt deinen **Such-Prompt**, deinen **Lebenslauf** (⚙️ Einstellungen) und die **Anzeige** und liefert:\n- Buzzwords in Klartext\n- Anforderungen ✅ / ◐ / ❌ gegen deinen Lebenslauf\n- Remote-Einschätzung, Firma, Warnsignale\n- 3 Argumente für die Bewerbung, Fragen fürs Gespräch\n- Ampel 🟢 🟡 🔴\n\nModell = „Tiefen-Check“ in ⚙️ Einstellungen. Ohne Websuche (spart Geld). Ergebnis in der Data Table **tiefencheck**.",
+        "width": 760,
+        "height": 350,
+        "color": 4
+      }
+    },
+    {
+      "id": "a89db240-e165-44d0-9251-2163682c2d6a",
+      "name": "Start von der Seite",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-tiefencheck",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "POST {\"ids\":[12,34]} von der Ergebnis-Seite.",
+      "notesInFlow": true,
+      "webhookId": "6ec73dee-7fef-4e52-b991-c2b13593ad45"
+    },
+    {
+      "id": "b5ded3a7-7259-42d0-b034-5dd906466f5b",
+      "name": "Tabelle \"tiefencheck\" sicherstellen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "tiefencheck",
+        "columns": {
+          "column": [
+            {
+              "name": "job_id",
+              "type": "number"
+            },
+            {
+              "name": "ampel",
+              "type": "string"
+            },
+            {
+              "name": "ergebnis",
+              "type": "string"
+            },
+            {
+              "name": "modell",
+              "type": "string"
+            },
+            {
+              "name": "geprueft_am",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Legt die Tabelle beim ersten Lauf an.",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "87b93ae4-0a07-40a2-a7b3-82705b62dae1",
+      "name": "Profil laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/profil",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Such-Prompt + Lebenslauf aus ⚙️ Einstellungen.",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "9cd376bb-e5cf-4262-a814-e65d8bb4b4c7",
+      "name": "Tiefencheck-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/tiefencheck.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/tiefencheck.md",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "01787396-f2d0-4104-8d72-ec4f18299023",
+      "name": "Alle Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Zum Heraussuchen der gewünschten Stellen.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "489523f7-85d3-4adf-b409-3a2b7337dc65",
+      "name": "Meine Notizen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1080,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "meine_auswahl"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Deine Tendenz + Notiz pro Stelle – die KI soll sie beachten.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "c49e8e1f-3786-42fb-8b54-84d9bacf5ea4",
+      "name": "Gewünschte Stellen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Nur echte Zahlen-IDs annehmen, höchstens 40 auf einmal (Kostenbremse)\nlet b = $('Start von der Seite').first().json.body || {};\nif (typeof b === 'string') {\n  try {\n    b = JSON.parse(b);\n  } catch (e) {\n    b = {};\n  }\n}\nconst ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((x) => Number.isInteger(x) && x > 0))].slice(0, 40);\nconst zeilen = {};\nfor (const i of $('Alle Stellen laden').all()) if (i.json.id) zeilen[i.json.id] = { ...i.json };\nfor (const i of $('Meine Notizen laden').all()) {\n  const z = zeilen[i.json.job_id];\n  if (z) Object.assign(z, { meine_notiz: i.json.notiz || '', meine_tendenz: i.json.tendenz || '' });\n}\n// Bereich je Stelle schickt die Seite mit (für den passenden Lebenslauf)\nconst bereich = {};\nfor (const s of Array.isArray(b.stellen) ? b.stellen : []) bereich[Number(s.id)] = String(s.bereich || '').slice(0, 80);\nconst aus = ids.filter((id) => zeilen[id]).map((id) => ({ json: { ...zeilen[id], _bereich: bereich[id] || '' } }));\nreturn aus.length ? aus : [{ json: { _leer: true } }];"
+      },
+      "notes": "IDs aus dem Knopfdruck → Zeilen aus \"jobs\".",
+      "notesInFlow": true
+    },
+    {
+      "id": "c50ea38a-0fa4-49c1-8031-68c2c3372d7e",
+      "name": "Gibt es Arbeit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9b99bc6d-a368-48ff-9cc1-efb121958819",
+              "leftValue": "={{ $json._leer !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "false = keine gültige Stelle übergeben.",
+      "notesInFlow": true
+    },
+    {
+      "id": "bcfec03b-a40c-43b7-a157-625fd099548c",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1680,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "662329c3-c8ca-4f38-8625-c4fd9a1ef643",
+      "name": "Seitentext aus Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Gespeicherter Text – kein neuer Abruf der Webseite.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3e7e58ed-ee0f-4c54-9186-b79c83ac5004",
+      "name": "Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: eine Stelle nach der anderen').first().json;\nconst cache = $('Seitentext aus Cache').first().json;\nconst p = $('Profil laden').first().json || {};\n// Lebenslauf des Bereichs der Stelle (Zeilen aus den Einstellungen); was dort fehlt, ersetzt der Standard\nconst lebenslaufFuer = (bereich, en) => {\n  const w = String(bereich || '').trim().toLowerCase();\n  const z = w ? (p.lebenslaeufe || []).find((x) => String(x.bereich || '').trim().toLowerCase() === w) : null;\n  const reihe = en ? [z && z.text_en, p.lebenslauf_en_text, z && z.text_de, p.lebenslauf_text] : [z && z.text_de, p.lebenslauf_text];\n  return reihe.find(Boolean) || '';\n};\nconst vorlage = String($('Tiefencheck-Prompt laden').first().json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [standard, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\n// Eigene Prüf-Anweisungen (⚙️ Einstellungen → 🔍 Tiefen-Check) ersetzen nur den System-Teil – Anfrage und Antwort-Schema bleiben fest\nconst system = String(p.tiefencheck_prompt || '').trim() || standard;\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, key) => (key in werte ? werte[key] : m));\nconst fakten = [\n  `Jobtitel: ${row.jobtitel || '-'}`, `Firma: ${row.firma || '-'}`, `Ort: ${row.ort || '-'}`, `Remote: ${row.remote || '-'}`,\n  `Remote-Regel (wörtlich): ${row.remote_regel_wortlaut || '-'}`, `Gehalt: ${row.gehalt || '-'}`, `Vertragsform: ${row.vertragsform || '-'}`,\n  `Bewerbungsweg: ${row.bewerbungsweg || '-'}`, `Veröffentlicht: ${row.veroeffentlichungsdatum || 'unbekannt'}`, `URL: ${row.url}`,\n].join('\\n');\nconst bewertung = `Score ${row.passung_score || '-'} (${row.bewertung || '-'}): ${String(row.bewertung_begruendung || '').replace(/\\s*\\[[^\\]]*\\]/g, '')}\\nOffene Fragen: ${row.offene_fragen || '-'}`;\nconst liste = (beschreibung, props, req) => ({ type: 'array', description: beschreibung, items: { type: 'object', additionalProperties: false, required: req, properties: props } });\nconst s = (d) => ({ type: 'string', description: d });\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['aufgaben_vergleich', 'empfehlung', 'kurzfazit', 'klartext', 'anforderungen', 'remote_einschaetzung', 'firma', 'warnsignale', 'argumente', 'fragen', 'unterlagen'],\n  properties: {\n    unterlagen: {\n      type: 'object',\n      additionalProperties: false,\n      required: ['anschreiben', 'lebenslauf', 'video', 'portfolio', 'hinweis'],\n      description: 'Was die Firma für die Bewerbung haben will – nur, was in der Anzeige steht',\n      properties: {\n        anschreiben: { type: 'string', enum: ['gefragt', 'nicht_noetig', 'unklar'], description: 'gefragt = Anschreiben/Cover Letter verlangt oder Feld dafür; nicht_noetig = Anzeige sagt ausdrücklich, dass keins nötig ist; sonst unklar' },\n        lebenslauf: { type: 'boolean' },\n        video: { type: 'boolean', description: 'Video-Vorstellung verlangt oder erwünscht' },\n        portfolio: { type: 'boolean', description: 'Portfolio, GitHub-Profil, Arbeitsproben oder Referenzen verlangt/erwünscht' },\n        hinweis: s('Kurz, was sonst verlangt ist (z. B. \"Fragen im Formular\", \"Gehaltsvorstellung\", \"englischer CV\") oder \"\"'),\n      },\n    },\n    aufgaben_vergleich: {\n      type: 'object',\n      additionalProperties: false,\n      required: ['bezug_suchprompt', 'urteil'],\n      properties: {\n        bezug_suchprompt: s('Welche Aussage aus dem Such-Prompt betrifft diese Rolle? Sinngemäß, in Du-Form, 1 Satz (z. B. \"Du hast geschrieben, dass du auch Vertrieb machst, wenn es zu deinen Skills passt.\")'),\n        urteil: s('2–3 Sätze: Passen die konkreten Aufgaben und Anforderungen der Stelle zu dem, was du laut Lebenslauf kannst? Klar sagen, ob es noch in deinem Bereich liegt oder weit mehr verlangt (und was genau)'),\n      },\n    },\n    empfehlung: { type: 'string', enum: ['unbedingt_bewerben', 'probier_es', 'erwarte_nichts'], description: 'unbedingt_bewerben = passt sehr gut; probier_es = Chance da, aber Lücken/offene Punkte; erwarte_nichts = verlangt deutlich mehr/anderes, nur bewerben wenn Zeit übrig' },\n    kurzfazit: s('GENAU EIN kurzer Satz in Du-Form, z. B. \"Die Stelle kann passen, wenn …\" oder \"Passt, weil …\" oder \"Eher nicht, weil …\". Max. 25 Wörter'),\n    klartext: liste('Buzzwords → Klartext, max. 6', { begriff: s('wörtlich aus der Anzeige'), bedeutet: s('Klartext') }, ['begriff', 'bedeutet']),\n    anforderungen: liste('Anforderungen gegen Lebenslauf, max. 10', { anforderung: s('Anforderung'), status: { type: 'string', enum: ['erfuellt', 'teilweise', 'fehlt'] }, beleg: s('kurzer Beleg aus dem Lebenslauf') }, ['anforderung', 'status', 'beleg']),\n    remote_einschaetzung: s('Wie realistisch ist ortsunabhängiges Arbeiten von überall (ohne festen Wohnsitz, wechselnde Länder)? Mit Zitat aus der Anzeige'),\n    firma: s('Was man über die Firma weiß – Fremdwissen als (KI-Wissen, ungeprüft) markieren'),\n    warnsignale: s('Warnsignale oder \"keine\"'),\n    argumente: { type: 'array', items: { type: 'string' }, description: 'Die 3 stärksten Argumente für eine Bewerbung' },\n    fragen: { type: 'array', items: { type: 'string' }, description: '3–5 Fragen fürs erste Gespräch' },\n  },\n};\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, {\n        HEUTE: $now.toFormat('yyyy-MM-dd'),\n        KRITERIEN: p.kriterien || '(kein Such-Prompt hinterlegt)',\n        LEBENSLAUF: lebenslaufFuer(row._bereich, false) || '(kein Lebenslauf hochgeladen)',\n        FAKTEN: fakten,\n        BEWERTUNG: bewertung,\n        NOTIZ: `Tendenz: ${row.meine_tendenz || '-'}\\nNotiz: ${String(row.meine_notiz || '').trim() || '(keine)'}`,\n        SEITENTEXT: '{{SEITENTEXT}}',\n      }),\n      seitentext: cache && cache.ok ? String(cache.text) : '(kein Seitentext im Cache – nur Fakten verwenden)',\n      schema: SCHEMA,\n      funktion: 'tiefencheck', // Modell laut ⚙️ Einstellungen\n      claude_effort_override: 'medium',\n      ollama_denken_override: 'an',\n      kontext: { id: row.id },\n    },\n  },\n];"
+      },
+      "notes": "Such-Prompt + Lebenslauf + Anzeige + JSON-Schema.",
+      "notesInFlow": true
+    },
+    {
+      "id": "67022971-b048-4ad4-9452-59bf7ad243e0",
+      "name": "KI: Tiefen-Check",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "1675b468-095a-44c0-8a0a-717bc65e7a6c",
+      "name": "Ergebnis aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nconst id = r.kontext && r.kontext.id;\nconst jetzt = new Date().toISOString();\nif (!r.ok) return [{ json: { job_id: id, ampel: 'fehler', ergebnis: JSON.stringify({ fehler: r.fehler || 'keine Antwort' }), modell: `${r.anbieter}:${r.modell}`, geprueft_am: jetzt } }];\n// Ampel für Tabelle/Listen aus der Empfehlung ableiten\nconst AMPEL = { unbedingt_bewerben: 'gruen', probier_es: 'gelb', erwarte_nichts: 'rot' };\nreturn [{ json: { job_id: id, ampel: AMPEL[r.daten.empfehlung] || String(r.daten.ampel || ''), ergebnis: JSON.stringify(r.daten), modell: `${r.anbieter}:${r.modell}`, geprueft_am: jetzt } }];"
+      },
+      "notes": "Ganzes Ergebnis als JSON-Text in eine Spalte.",
+      "notesInFlow": true
+    },
+    {
+      "id": "2de6148b-2236-4dbd-9813-1bf044ba7caf",
+      "name": "In tiefencheck speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "tiefencheck"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "job_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.job_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Nochmal prüfen = altes Ergebnis wird ersetzt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "d913d056-2c31-4971-b96a-356b483f3750",
+      "name": "Stelle fertig",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { fertig: true } }];"
+      },
+      "notes": "Ein Element zurück an die Schleife.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a06f4c99-b8c4-428a-88d9-790e8a0b1e3a",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        60
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { fertig: true, tipp: 'Ergebnis auf der Karte in Tab 3 · Prüfen' } }];"
+      },
+      "notes": "Fertig.",
+      "notesInFlow": true
+    },
+    {
+      "id": "fba28011-aa50-4251-a3c7-0350bf004c72",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Pr%C3%BCfen%20%C2%B7%20Tiefen-Check",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "a3418fd2-b430-4bcf-a9ff-f44200cb3f7e",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9caf83cf-495a-4418-9be9-810876d89935",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "21f0f67d-2507-4b66-909b-03b6818b1549",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "2a417d22-a2ed-44f3-b3e7-639db474b7b1",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('Stelle fertig').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Start von der Seite": {
+      "main": [
+        [
+          {
+            "node": "Tabelle \"tiefencheck\" sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabelle \"tiefencheck\" sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Profil laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profil laden": {
+      "main": [
+        [
+          {
+            "node": "Tiefencheck-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiefencheck-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Alle Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alle Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Meine Notizen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meine Notizen laden": {
+      "main": [
+        [
+          {
+            "node": "Gewünschte Stellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gewünschte Stellen": {
+      "main": [
+        [
+          {
+            "node": "Gibt es Arbeit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es Arbeit?": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seitentext aus Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seitentext aus Cache": {
+      "main": [
+        [
+          {
+            "node": "Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "KI: Tiefen-Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Tiefen-Check": {
+      "main": [
+        [
+          {
+            "node": "Ergebnis aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ergebnis aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "In tiefencheck speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In tiefencheck speichern": {
+      "main": [
+        [
+          {
+            "node": "Stelle fertig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stelle fertig": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Gründliche Prüfung einzelner Favoriten gegen Lebenslauf und Such-Prompt.",
+  "tags": [],
+  "isArchived": false
+}

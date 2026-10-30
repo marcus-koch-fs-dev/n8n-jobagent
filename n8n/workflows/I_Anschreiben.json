@@ -1,0 +1,668 @@
+{
+  "id": "jaAnschreibenI01",
+  "name": "5 Bewerben · Anschreiben erstellen (auf Knopfdruck)",
+  "nodes": [
+    {
+      "id": "dc850a6e-bd5e-40d0-8982-94fc3604cc9c",
+      "name": "Notiz 00c9af",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -380
+      ],
+      "parameters": {
+        "content": "## I – Anschreiben erstellen\nStart per Knopf **✉️ Anschreiben erstellen** auf einer Kachel (Tab 5 · Bewerben → 📝 bereit). Nie automatisch.\n\nDie KI bekommt deinen **Stil-Text**, ggf. dein **Beispiel-Anschreiben**, den **Lebenslauf**, die **Anzeige** und das Ergebnis des **Tiefen-Checks** und schreibt Betreff, Anrede, Brieftext und Gruß.\n\nDer Browser-Dienst setzt den Text in deine **Word-Vorlage** und speichert die Datei im Bewerbungs-Ordner (Unterordner pro Firma – siehe ⚙️ Einstellungen).\n\nModell = „Anschreiben“ in ⚙️ Einstellungen.",
+        "width": 760,
+        "height": 330,
+        "color": 4
+      }
+    },
+    {
+      "id": "73420892-bc02-4762-92ab-25aa3548ff0a",
+      "name": "Start von der Seite",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-anschreiben",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "http://localhost:3000"
+        }
+      },
+      "notes": "POST {\"ids\":[12,34]} von der Ergebnis-Seite.",
+      "notesInFlow": true,
+      "webhookId": "d4bd5e94-6e77-476c-b55b-410f4833f72c"
+    },
+    {
+      "id": "639914fe-563b-4e1f-ba42-1f01356786ce",
+      "name": "Profil laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/profil",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Lebenslauf, Stil-Text, Beispiel aus ⚙️ Einstellungen.",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "371ce430-841b-4b35-9813-f0da90a85ba2",
+      "name": "Anschreiben-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/anschreiben.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/anschreiben.md",
+      "notesInFlow": true,
+      "executeOnce": true
+    },
+    {
+      "id": "e7d7eb4c-6e0c-47b6-af05-7a46ac8f6450",
+      "name": "Alle Stellen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Zum Heraussuchen der gewünschten Stellen.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "6bd622bb-459f-4a88-bf8f-1d631ba1c91c",
+      "name": "Meine Notizen laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "meine_auswahl"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Deine Notiz pro Stelle.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "ad6cb82b-ba50-4711-b70f-a87137211ca7",
+      "name": "Tiefen-Checks laden",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "tiefencheck"
+        },
+        "matchType": "allConditions",
+        "returnAll": true
+      },
+      "notes": "Argumente und Anforderungen aus dem Tiefen-Check.",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "1ccc57fb-0100-448e-ba64-21be1b8e00de",
+      "name": "Gewünschte Stellen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Nur echte Zahlen-IDs, höchstens 30 auf einmal (Kostenbremse)\nlet b = $('Start von der Seite').first().json.body || {};\nif (typeof b === 'string') {\n  try {\n    b = JSON.parse(b);\n  } catch (e) {\n    b = {};\n  }\n}\nconst ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter((x) => Number.isInteger(x) && x > 0))].slice(0, 40);\n// Pro Stelle: Art der Mappe (voll / kurz / keins) und ggf. Modell – von der Seite (Ampel + gewünschte Unterlagen)\nconst wunsch = {};\nfor (const s of Array.isArray(b.stellen) ? b.stellen : []) {\n  const art = ['voll', 'kurz', 'keins'].includes(s.art) ? s.art : 'voll';\n  const modell = /^claude-[a-z0-9-]{3,40}$/.test(String(s.modell || '')) ? s.modell : '';\n  wunsch[Number(s.id)] = { art, modell, bereich: String(s.bereich || '').slice(0, 80) };\n}\nconst zeilen = {};\nfor (const i of $('Alle Stellen laden').all()) if (i.json.id) zeilen[i.json.id] = { ...i.json };\nfor (const i of $('Meine Notizen laden').all()) {\n  const z = zeilen[i.json.job_id];\n  if (z) z.meine_notiz = i.json.notiz || '';\n}\nfor (const i of $('Tiefen-Checks laden').all()) {\n  const z = zeilen[i.json.job_id];\n  if (z) z.tc_ergebnis = i.json.ergebnis || '';\n}\nconst aus = ids.filter((id) => zeilen[id]).map((id) => ({ json: { ...zeilen[id], _art: (wunsch[id] || {}).art || 'voll', _modell: (wunsch[id] || {}).modell || '', _bereich: (wunsch[id] || {}).bereich || '' } }));\nreturn aus.length ? aus : [{ json: { _leer: true } }];"
+      },
+      "notes": "IDs aus dem Knopfdruck → Zeilen aus \"jobs\" + Notiz + Tiefen-Check + Art der Mappe.",
+      "notesInFlow": true
+    },
+    {
+      "id": "42430805-7299-499b-8b01-04a9d2f86c05",
+      "name": "Gibt es Arbeit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8e7f4686-77cb-4295-ac2f-ec9126f83726",
+              "leftValue": "={{ $json._leer !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "false = keine gültige Stelle übergeben.",
+      "notesInFlow": true
+    },
+    {
+      "id": "4e3b6b53-33b0-43cd-87f6-9d14229d8063",
+      "name": "Schleife: eine Stelle nach der anderen",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1680,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Gibt immer EINE Stelle weiter (Ausgang \"loop\"). Wenn alle durch sind, geht es bei \"done\" weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f7ac41cb-f270-439d-8ae6-c1062ca49fa8",
+      "name": "Seitentext aus Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Gespeicherter Text – kein neuer Abruf der Webseite.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "aa722310-01f7-452f-bea9-399f4f6b641e",
+      "name": "Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: eine Stelle nach der anderen').first().json;\nconst cache = $('Seitentext aus Cache').first().json;\nconst p = $('Profil laden').first().json || {};\n// Lebenslauf des Bereichs der Stelle (Zeilen aus den Einstellungen); was dort fehlt, ersetzt der Standard\nconst lebenslaufFuer = (bereich, en) => {\n  const w = String(bereich || '').trim().toLowerCase();\n  const z = w ? (p.lebenslaeufe || []).find((x) => String(x.bereich || '').trim().toLowerCase() === w) : null;\n  const reihe = en ? [z && z.text_en, p.lebenslauf_en_text, z && z.text_de, p.lebenslauf_text] : [z && z.text_de, p.lebenslauf_text];\n  return reihe.find(Boolean) || '';\n};\n// Stil-Text aus den Einstellungen: ist er eine komplette Chat-Vorlage, gehört alles ab dem Trenner „---“ (Auftrag + leere\n// Datenabschnitte) nicht hinein, ebenso Abschnitte, die nur einen Platzhalter enthalten – die echten Daten folgen unten im Prompt.\nconst stilBereinigen = (s) => String(s || '')\n  .split(/\\n-{3,}\\s*\\n/)[0]\n  .replace(/^#{1,6} [^\\n]*\\n(?:[ \\t]*\\n)*[ \\t]*\\{\\{\\w+\\}\\}[ \\t]*(?:\\n|$)/gm, '')\n  .replace(/^[ \\t]*\\{\\{\\w+\\}\\}[ \\t]*$/gm, '')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\nconst vorlage = String($('Anschreiben-Prompt laden').first().json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\n// Sprache der Anzeige grob erkennen (häufige englische vs. deutsche Wörter)\nconst anzeige = String((cache && cache.text) || '');\nconst zaehl = (re) => (anzeige.match(re) || []).length;\nconst englisch = zaehl(/\\b(the|and|you|with|our|we|for)\\b/g) > zaehl(/\\b(und|die|der|wir|mit|für|Sie|du)\\b/g);\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, key) => (key in werte ? werte[key] : m));\nconst fakten = [\n  `Jobtitel: ${row.jobtitel || '-'}`, `Firma: ${row.firma || '-'}`, `Ort: ${row.ort || '-'}`, `Remote: ${row.remote || '-'}`,\n  `Gehalt: ${row.gehalt || '-'}`, `Vertragsform: ${row.vertragsform || '-'}`, `Bewerbungsweg: ${row.bewerbungsweg || '-'}`,\n].join('\\n');\n// Tiefen-Check kompakt: Empfehlung, Argumente, Anforderungen\nlet tc = '(kein Tiefen-Check vorhanden)';\ntry {\n  const d = JSON.parse(row.tc_ergebnis || '');\n  tc = [\n    `Empfehlung: ${d.empfehlung || d.ampel || '-'} – ${d.kurzfazit || d.fazit || ''}`,\n    d.aufgaben_vergleich ? `Aufgaben vs. Person: ${d.aufgaben_vergleich.urteil || ''}` : '',\n    'Stärkste Argumente:\\n' + (d.argumente || []).map((a) => '- ' + a).join('\\n'),\n    'Anforderungen:\\n' + (d.anforderungen || []).map((a) => `- ${a.anforderung}: ${a.status} (${a.beleg || ''})`).join('\\n'),\n  ].filter(Boolean).join('\\n\\n');\n} catch (e) {\n  /* kein gültiger Check */\n}\n// Art der Mappe: voll = normales Anschreiben, kurz = Kurzfassung, keins = Firma will keins → nur Kurznachricht\nconst art = row._art || 'voll';\nconst AUFTRAG = {\n  voll: 'Schreibe das Anschreiben wie oben beschrieben. Zusätzlich das Feld \"kurznachricht\".',\n  kurz: 'Die Anzeige sagt nicht klar, ob ein Anschreiben gewünscht ist. Schreibe deshalb eine KOMPAKTE Fassung mit demselben Aufbau: Einstieg mit dem Problem der Firma, EIN Belegabsatz mit dem passendsten Beleg und dem Nutzen für die Firma, kurzer Schluss. 120 bis 160 Wörter, keine Ein-Satz-Absätze. Zusätzlich das Feld \"kurznachricht\".',\n  keins: 'Die Firma will KEIN Anschreiben. Lass \"absaetze\" leer ([]) und schreibe NUR das Feld \"kurznachricht\". Betreff, Anrede und Gruß trotzdem ausfüllen.',\n}[art];\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['sprache', 'betreff', 'anrede', 'absaetze', 'gruss', 'firmensitz', 'strasse', 'plz_ort', 'kurznachricht'],\n  properties: {\n    kurznachricht: {\n      type: 'string',\n      description: '3–4 Sätze für das Nachrichtenfeld im Bewerbungsformular oder als E-Mail-Text, in der Sprache der Anzeige: wer ich bin, warum genau diese Stelle (ein konkreter Punkt), Hinweis auf den Lebenslauf im Anhang. Gleiche Regeln wie beim Anschreiben (förmlich, keine Floskeln, keine Doppelpunkte). Mit kurzer Anrede, ohne Grußformel.',\n    },\n    sprache: { type: 'string', enum: ['de', 'en'] },\n    betreff: { type: 'string', description: 'Kurz: \"Bewerbung als <Kern-Stellentitel>\" – OHNE (m/w/d) und ohne Zusätze nach Bindestrich, z. B. \"Bewerbung als AI Product Builder\"' },\n    anrede: { type: 'string', description: 'Förmlich: \"Sehr geehrte Frau Muster,\" / \"Sehr geehrtes Metanoia-Team,\" / englisch \"Dear Ms Muster,\" bzw. \"Dear Hiring Team,\" – nie \"Hallo\"' },\n    strasse: { type: 'string', description: 'Straße und Hausnummer der Firma, NUR wenn sie in der Anzeige steht – sonst \"\"' },\n    plz_ort: { type: 'string', description: 'PLZ und Ort der Firma, NUR wenn die PLZ in der Anzeige steht – sonst \"\"' },\n    absaetze: { type: 'array', items: { type: 'string' }, description: 'Nur der Brieftext, 3–5 Absätze, ohne Anrede und Gruß' },\n    gruss: { type: 'string', description: 'z. B. \"Viele Grüße\" / \"Best regards\" – ohne Namen' },\n    firmensitz: { type: 'string', description: 'Stadt der Firma kurz, z. B. \"Wien\" – oder \"remote\"' },\n  },\n};\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, {\n        HEUTE: $now.toFormat('yyyy-MM-dd'),\n        STIL: stilBereinigen(p.anschreiben_prompt) || '(keine Vorgaben – schreibe knapp, konkret, ohne Floskeln)',\n        BEISPIEL: p.beispiel_text || '(kein Beispiel hinterlegt)',\n        // Englische Anzeige + englischer CV vorhanden → den nehmen (passende Formulierungen)\n        LEBENSLAUF: lebenslaufFuer(row._bereich, englisch) || '(kein Lebenslauf hochgeladen)',\n        FAKTEN: fakten,\n        TIEFENCHECK: tc,\n        NOTIZ: String(row.meine_notiz || '').trim() || '(keine)',\n        SEITENTEXT: '{{SEITENTEXT}}',\n      }) + `\\n\\n## Auftrag für diese Stelle\\n${AUFTRAG}`, // hinten anhängen – der zwischengespeicherte Anfang bleibt gleich\n      seitentext: cache && cache.ok ? String(cache.text) : '(kein Seitentext im Cache – nur Fakten verwenden)',\n      schema: SCHEMA,\n      funktion: 'anschreiben', // Modell laut ⚙️ Einstellungen …\n      claude_modell_zwang: row._modell || '', // … außer die Seite gibt eins vor (z. B. gelb → Sonnet, ohne Anschreiben → Haiku)\n      claude_effort_override: 'medium',\n      kontext: { id: row.id, firma: row.firma || row.domain || '', stelle: row.jobtitel || row.linktext || '', art, bereich: row._bereich || '' },\n    },\n  },\n];"
+      },
+      "notes": "Stil + Beispiel + Lebenslauf + Anzeige + Tiefen-Check + JSON-Schema.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7b2e65fa-bbd5-4043-8612-743200e28a7b",
+      "name": "KI: Anschreiben",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft den KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6fd61bf7-6001-4a51-8bde-73b3aef0614c",
+      "name": "Für Word aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nconst k = r.kontext || {};\nif (!r.ok) return [{ json: { job_id: k.id, fehler: r.fehler || 'keine Antwort' } }];\nconst d = r.daten || {};\nreturn [{ json: { job_id: k.id, firma: k.firma, stelle: k.stelle, art: k.art || 'voll', bereich: k.bereich || '', ...d, modell: `${r.anbieter}:${r.modell}` } }];"
+      },
+      "notes": "Text + Firma/Stelle für den Browser-Dienst.",
+      "notesInFlow": true
+    },
+    {
+      "id": "4775f2d5-da84-412a-bb63-e164e9e922a0",
+      "name": "Word-Datei erzeugen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/anschreiben/speichern",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "notes": "Browser-Dienst setzt den Text in deine Word-Vorlage und speichert im Bewerbungs-Ordner.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "4a768214-8cd8-4133-86b7-b4571caccfe5",
+      "name": "Stelle fertig",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { fertig: true } }];"
+      },
+      "notes": "Ein Element zurück an die Schleife.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1ab3812f-7485-4cb0-be58-13e101f7632f",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        60
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { fertig: true, tipp: 'Anschreiben auf der Kachel in Tab 5 · Bewerben' } }];"
+      },
+      "notes": "Fertig.",
+      "notesInFlow": true
+    },
+    {
+      "id": "922fc9e5-f977-4306-be94-0bfe403601b9",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Bewerben%20%C2%B7%20Anschreiben",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "8330fa35-ecb9-408a-a162-41d4d09f22b1",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b77088d-ee57-4284-b68f-b3103a40c9e9",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "619cd084-c89d-4c79-89fc-734eced89e1a",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "9f7546bd-7cce-4667-95c8-3fcba1465c53",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('Stelle fertig').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Start von der Seite": {
+      "main": [
+        [
+          {
+            "node": "Profil laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profil laden": {
+      "main": [
+        [
+          {
+            "node": "Anschreiben-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anschreiben-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Alle Stellen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alle Stellen laden": {
+      "main": [
+        [
+          {
+            "node": "Meine Notizen laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meine Notizen laden": {
+      "main": [
+        [
+          {
+            "node": "Tiefen-Checks laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiefen-Checks laden": {
+      "main": [
+        [
+          {
+            "node": "Gewünschte Stellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gewünschte Stellen": {
+      "main": [
+        [
+          {
+            "node": "Gibt es Arbeit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es Arbeit?": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: eine Stelle nach der anderen": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Seitentext aus Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seitentext aus Cache": {
+      "main": [
+        [
+          {
+            "node": "Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "KI: Anschreiben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Anschreiben": {
+      "main": [
+        [
+          {
+            "node": "Für Word aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Für Word aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Word-Datei erzeugen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Word-Datei erzeugen": {
+      "main": [
+        [
+          {
+            "node": "Stelle fertig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stelle fertig": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: eine Stelle nach der anderen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Schreibt ein Anschreiben pro Stelle und speichert es als Word-Datei.",
+  "tags": [],
+  "isArchived": false
+}

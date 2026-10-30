@@ -1,0 +1,873 @@
+{
+  "id": "jaStelleVerarb02",
+  "name": "9 Technik · Eine Stelle verarbeiten (von Schritt 3 genutzt)",
+  "nodes": [
+    {
+      "id": "c3c6dec7-dc79-49c3-bcda-94ecbdab550c",
+      "name": "Notiz 3d57d5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## 02 – Eine Stelle verarbeiten (Stufen 2–5)\nWird von **A** (neue Links) und **B** (freigegebene Links) aufgerufen – immer für genau **eine** Stelle.\n\n1. **Stufe 2 – Schnellcheck:** einfacher HTTP-Aufruf ohne Browser. 404/410 oder Weiterleitung auf eine allgemeine Karriereseite → **tot**.\n2. **Stufe 3 – Browser:** Playwright lädt die Seite, klickt Cookie-Banner weg, speichert Text + Screenshot im Cache. Login/Captcha → **wartet_auf_freigabe** (wird NICHT umgangen).\n3. **Stufe 4 – KI-Extraktion:** Fakten als festes JSON.\n4. **Stufe 5 – Aussortieren:** abgelaufen, zu alt, keine einzelne Stelle, Dublette.\n5. Ergebnis in die Tabelle **jobs** schreiben.",
+        "width": 760,
+        "height": 380,
+        "color": 4
+      }
+    },
+    {
+      "id": "e741a2b3-edcb-4e53-8d0b-4816a30aa495",
+      "name": "Notiz b3b2d3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        470
+      ],
+      "parameters": {
+        "content": "### Cookie-Fallback\nNur wenn der Banner nicht automatisch wegging UND die Seite kaum Text zeigt: Das LLM wählt aus den Button-Texten den richtigen aus, danach wird die Seite neu geladen.",
+        "width": 900,
+        "height": 150,
+        "color": 6
+      }
+    },
+    {
+      "id": "b7afb7a5-4db5-4f66-923c-3f4a14e90606",
+      "name": "Wenn von anderem Workflow aufgerufen",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        200
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Startpunkt, wenn ein anderer Workflow diesen aufruft. Nimmt alle Daten unverändert an.",
+      "notesInFlow": true
+    },
+    {
+      "id": "8d5ca6da-9ce9-4e13-b072-b54bcc62db8f",
+      "name": "Schon abgerufen? (A1)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "72efa894-79e3-4c2c-be20-8628bf2cd081",
+              "leftValue": "={{ $json.status === 'abgerufen' && !!$json.cache_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = Seite liegt schon im Cache → nicht neu laden.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7a8e387c-9d0f-4886-abf3-6c3c84911a8a",
+      "name": "Gespeicherte Seite laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        40
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://browser:3000/cache/{{ $json.cache_id }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Text aus dem Cache (von A1 gespeichert).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b1498675-9246-4de3-a421-d2b81a5bf1ea",
+      "name": "Stufe 2: Schnellcheck (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 20000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "notes": "Einfacher Abruf OHNE Browser und OHNE Weiterleitungen folgen. Schnell und billig.",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f7fcf88e-4e15-4432-b5d6-063a72ca0a24",
+      "name": "Schnellcheck auswerten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Wenn von anderem Workflow aufgerufen').first().json;\nconst r = $json;\nconst code = r.statusCode || null;\nconst fehlerText = r.error ? (typeof r.error === 'string' ? r.error : r.error.message || JSON.stringify(r.error)) : '';\n\n// Hinweis: Im n8n-Code-Knoten gibt es kein \"new URL(...)\".\n// Deshalb zerlegen wir Adressen mit einem regulären Ausdruck selbst.\nfunction zerlegeUrl(roh) {\n  const m = String(roh || '').trim().match(/^(https?):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i);\n  if (!m) return null;\n  return { protokoll: m[1].toLowerCase(), host: m[2].toLowerCase(), pfad: m[3] || '/', query: m[4] || '' };\n}\n\n// Macht aus einer relativen Weiterleitung (\"/karriere\") eine volle Adresse.\nfunction absoluteUrl(ziel, basis) {\n  if (/^https?:\\/\\//i.test(ziel)) return ziel;\n  const b = zerlegeUrl(basis);\n  if (!b) return ziel;\n  if (ziel.startsWith('//')) return b.protokoll + ':' + ziel;\n  if (ziel.startsWith('/')) return b.protokoll + '://' + b.host + ziel;\n  return b.protokoll + '://' + b.host + b.pfad.replace(/[^\\/]*$/, '') + ziel;\n}\n\n// Zeigt eine Adresse nur noch auf eine allgemeine Karriere- oder Startseite?\nfunction istAllgemeineSeite(ziel, original) {\n  const z = zerlegeUrl(ziel);\n  const o = zerlegeUrl(original);\n  if (!z || !o) return false;\n  const pfad = (u) => u.pfad.replace(/\\/+$/, '').toLowerCase();\n  const host = (u) => u.host.replace(/^www\\./, '');\n  if (host(z) === host(o) && pfad(z) === pfad(o)) return false; // z. B. nur http -> https\n  const p = pfad(z);\n  if (p === '') return true;\n  if (/^(\\/[a-z]{2}(-[a-z]{2})?)?(\\/(karriere|career|careers|jobs|job|stellenangebote|stellen|offene-stellen|jobboerse|join-us|joinus|vacancies|work-with-us|search|suche))*$/.test(p)) return true;\n  if (/[?&](error|expired|notfound|jobnotfound)=/i.test(z.query)) return true;\n  return false;\n}\n\nlet entscheidung = 'weiter';\nlet hinweis = '';\nif (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(fehlerText)) {\n  entscheidung = 'tot';\n  hinweis = 'Domain existiert nicht (mehr)';\n} else if (code === 404 || code === 410) {\n  entscheidung = 'tot';\n  hinweis = `HTTP ${code}: Seite gibt es nicht mehr`;\n} else if (code >= 300 && code < 400) {\n  const loc = r.headers && (r.headers.location || r.headers.Location);\n  if (loc) {\n    const ziel = absoluteUrl(loc, row.url);\n    if (istAllgemeineSeite(ziel, row.url)) {\n      entscheidung = 'tot';\n      hinweis = `Weiterleitung auf allgemeine Seite: ${ziel}`;\n    }\n  }\n}\n\nreturn {\n  json: {\n    ...row,\n    status: entscheidung === 'tot' ? 'tot' : row.status,\n    hinweis,\n    http_status: code,\n    abgerufen_am: new Date().toISOString(),\n    _entscheidung: entscheidung,\n  },\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "notes": "404/410, tote Domain oder Weiterleitung auf eine Übersicht → \"tot\".",
+      "notesInFlow": true
+    },
+    {
+      "id": "00e33881-c20c-4816-b99a-42aae19e1e9d",
+      "name": "Schon tot?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ad8e8848-5afa-4b90-ba5d-5e285a3f06e6",
+              "leftValue": "={{ $json._entscheidung === 'tot' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = nicht weiter verarbeiten, direkt speichern.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c1f0f2e1-3b6f-4f11-b79c-ef252ebf2f9f",
+      "name": "Stufe 3: Browser-Abruf (Playwright)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/fetch",
+        "options": {
+          "timeout": 240000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.url }) }}"
+      },
+      "notes": "Der Browser-Dienst lädt die Seite in Chromium, klickt Cookie-Banner weg, speichert Text + Screenshot.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ac2b700c-2b2f-47b4-920f-de3a5b3aece9",
+      "name": "Cookie-Banner blockiert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5f6c51d3-c3da-420a-84c1-ccf98c38c00e",
+              "leftValue": "={{ $json.ok === true && $json.consent && $json.consent.accepted === false && ($json.consent.candidates || []).length > 0 && ($json.textLength || 0) < 1500 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "Nur wenn ein Banner offen ist UND kaum Text sichtbar ist.",
+      "notesInFlow": true
+    },
+    {
+      "id": "6c7b6a74-7fb4-465f-ac87-c865573cdcbd",
+      "name": "Consent-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/consent_fallback.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/consent_fallback.md",
+      "notesInFlow": true
+    },
+    {
+      "id": "e7b89693-05a5-44e0-9b69-58018e7e026d",
+      "name": "Consent-Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        560
+      ],
+      "parameters": {
+        "jsCode": "const abruf = $('Stufe 3: Browser-Abruf (Playwright)').first().json;\nconst row = $('Wenn von anderem Workflow aufgerufen').first().json;\n\n// Prompt-Datei: \"#\"-Zeilen sind Kommentare, \"=== ANFRAGE ===\" trennt System und Anfrage.\nconst vorlage = String($json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, k) => (k in werte ? werte[k] : m));\n\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, { URL: abruf.url, BUTTONS: abruf.consent.candidates.map((b) => '- ' + b).join('\\n') }),\n      seitentext: '',\n      schema: {\n        type: 'object',\n        additionalProperties: false,\n        required: ['button_text'],\n        properties: { button_text: { type: 'string', description: 'Exakter Button-Text aus der Liste oder leer' } },\n      },\n      anbieter_override: row.anbieter_override || '',\n      kontext: { url: abruf.url },\n    },\n  },\n];"
+      },
+      "notes": "Baut die Frage: \"Welcher dieser Buttons akzeptiert alle Cookies?\"",
+      "notesInFlow": true
+    },
+    {
+      "id": "dc04681a-a488-4fe7-9a7f-56eec8c80b16",
+      "name": "KI: Cookie-Button wählen",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        560
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3b7782ee-7f05-4b7f-a392-74ede0be8b3e",
+      "name": "Gewählten Button übernehmen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        560
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Wenn von anderem Workflow aufgerufen').first().json;\nconst button = $json.ok && $json.daten ? String($json.daten.button_text || '') : '';\nreturn [{ json: { url: row.url, consentButtonText: button } }];"
+      },
+      "notes": "Nimmt den vom LLM gewählten Button-Text.",
+      "notesInFlow": true
+    },
+    {
+      "id": "fa01cc73-b204-4767-aa31-1905d3b7cc11",
+      "name": "Stufe 3b: Abruf mit gewähltem Button",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/fetch",
+        "options": {
+          "timeout": 240000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.url, consentButtonText: $json.consentButtonText }) }}"
+      },
+      "notes": "Seite neu laden und diesmal genau diesen Button klicken.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3019785c-5c96-4fb3-8eec-0f3fd80295b3",
+      "name": "Abruf auswerten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Wenn von anderem Workflow aufgerufen').first().json;\nconst r = $json;\n\n// Hinweis: Im n8n-Code-Knoten gibt es kein \"new URL(...)\".\n// Deshalb zerlegen wir Adressen mit einem regulären Ausdruck selbst.\nfunction zerlegeUrl(roh) {\n  const m = String(roh || '').trim().match(/^(https?):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i);\n  if (!m) return null;\n  return { protokoll: m[1].toLowerCase(), host: m[2].toLowerCase(), pfad: m[3] || '/', query: m[4] || '' };\n}\n\n// Macht aus einer relativen Weiterleitung (\"/karriere\") eine volle Adresse.\nfunction absoluteUrl(ziel, basis) {\n  if (/^https?:\\/\\//i.test(ziel)) return ziel;\n  const b = zerlegeUrl(basis);\n  if (!b) return ziel;\n  if (ziel.startsWith('//')) return b.protokoll + ':' + ziel;\n  if (ziel.startsWith('/')) return b.protokoll + '://' + b.host + ziel;\n  return b.protokoll + '://' + b.host + b.pfad.replace(/[^\\/]*$/, '') + ziel;\n}\n\n// Zeigt eine Adresse nur noch auf eine allgemeine Karriere- oder Startseite?\nfunction istAllgemeineSeite(ziel, original) {\n  const z = zerlegeUrl(ziel);\n  const o = zerlegeUrl(original);\n  if (!z || !o) return false;\n  const pfad = (u) => u.pfad.replace(/\\/+$/, '').toLowerCase();\n  const host = (u) => u.host.replace(/^www\\./, '');\n  if (host(z) === host(o) && pfad(z) === pfad(o)) return false; // z. B. nur http -> https\n  const p = pfad(z);\n  if (p === '') return true;\n  if (/^(\\/[a-z]{2}(-[a-z]{2})?)?(\\/(karriere|career|careers|jobs|job|stellenangebote|stellen|offene-stellen|jobboerse|join-us|joinus|vacancies|work-with-us|search|suche))*$/.test(p)) return true;\n  if (/[?&](error|expired|notfound|jobnotfound)=/i.test(z.query)) return true;\n  return false;\n}\n\nconst basis = {\n  id: row.id,\n  url: row.url,\n  http_status: r.httpStatus === undefined ? null : r.httpStatus,\n  final_url: r.finalUrl || '',\n  cache_id: r.cacheId || '',\n  screenshot: r.screenshotUrl || '',\n  text_hash: r.textHash || '',\n  abgerufen_am: r.abgerufenAm || new Date().toISOString(),\n};\n\nlet status = 'pruefen';\nlet hinweis = '';\nconst fehler = r.error ? (typeof r.error === 'string' ? r.error : r.error.message || JSON.stringify(r.error)) : '';\nif (!r.ok) {\n  status = 'fehler';\n  hinweis = 'Abruf fehlgeschlagen: ' + (fehler || 'unbekannt');\n} else if (r.httpStatus === 404 || r.httpStatus === 410) {\n  status = 'tot';\n  hinweis = `HTTP ${r.httpStatus}`;\n} else if (istAllgemeineSeite(r.finalUrl, row.url)) {\n  status = 'tot';\n  hinweis = `Weitergeleitet auf allgemeine Seite: ${r.finalUrl}`;\n} else if (r.blocked && r.blocked.any) {\n  status = 'wartet_auf_freigabe';\n  hinweis = 'Freigabe nötig: ' + (r.blocked.reasons || []).join(', ') + (row.mit_sitzung ? ' (auch mit gespeicherter Sitzung noch gesperrt)' : '');\n} else if ((r.textLength || 0) < 200) {\n  status = 'fehler';\n  hinweis = 'Seite enthält kaum Text';\n}\n\nreturn [{ json: { ...basis, status, hinweis, _weiter: status === 'pruefen', _titel: r.title || '', _text: r.text || '' } }];"
+      },
+      "notes": "Entscheidet: tot / wartet_auf_freigabe / fehler – oder weiter zur KI.",
+      "notesInFlow": true
+    },
+    {
+      "id": "7fede5df-2813-42e1-9fa6-870b9b32f168",
+      "name": "Weiter zur KI?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8f2e7f48-fedd-4706-ad64-6a03b1f3ae24",
+              "leftValue": "={{ $json._weiter === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = Seite ist lesbar, jetzt Fakten extrahieren.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1fdef7d9-e2e9-4b3e-a7e4-2d19d76b2951",
+      "name": "Extraktions-Prompt laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/prompts/extraktion.md",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Liest prompts/extraktion.md (jedes Mal neu – du kannst die Datei jederzeit ändern).",
+      "notesInFlow": true
+    },
+    {
+      "id": "ce962e59-4a6e-4a66-a5b7-08fa3ce9449c",
+      "name": "Extraktions-Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const abruf = $('Abruf auswerten').first().json;\nconst row = $('Wenn von anderem Workflow aufgerufen').first().json;\n\n// Prompt-Datei zerlegen: \"#\"-Zeilen sind Kommentare für dich.\nconst vorlage = String($json.text || '').split('\\n').filter((z) => !/^#(?!#)/.test(z)) /* '# …' = Kommentar, '## …' = Überschrift bleibt */.join('\\n');\nconst [system, anfrage] = vorlage.split('=== ANFRAGE ===').map((t) => t.trim());\nconst fuellen = (t, werte) => t.replace(/\\{\\{(\\w+)\\}\\}/g, (m, k) => (k in werte ? werte[k] : m));\n\n// ---- Das feste Antwortformat (JSON-Schema) ----\n// Jedes Feld ist Pflicht; unbekannte Werte liefert das Modell als \"\".\nconst text = (beschreibung) => ({ type: 'string', description: beschreibung });\nconst SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: [\n    'seitentyp', 'status', 'datum_zitat', 'veroeffentlichungsdatum', 'jobtitel', 'firma', 'ort', 'remote',\n    'remote_regel_wortlaut', 'gehalt', 'vertragsform', 'bewerbungsweg', 'kurze_zusammenfassung', 'begruendung',\n  ],\n  properties: {\n    seitentyp: { type: 'string', enum: ['einzelne_stelle', 'stellenliste', 'keine_stelle'] },\n    status: { type: 'string', enum: ['aktiv', 'abgelaufen', 'unklar'] },\n    datum_zitat: text('Wörtliche Textstelle mit dem Veröffentlichungsdatum oder leer'),\n    veroeffentlichungsdatum: text('YYYY-MM-DD oder leer'),\n    jobtitel: text('Jobtitel'),\n    firma: text('Firmenname'),\n    ort: text('Ort/Land'),\n    remote: { type: 'string', enum: ['ja', 'nein', 'hybrid', 'unklar'] },\n    remote_regel_wortlaut: text('Wörtliches Zitat zur Remote-Regel'),\n    gehalt: text('Gehalt/Stundensatz wie angegeben'),\n    vertragsform: text('z. B. Festanstellung, Freelance, EOR'),\n    bewerbungsweg: text('z. B. Formular, E-Mail'),\n    kurze_zusammenfassung: text('2–3 Sätze'),\n    begruendung: text('1–2 Sätze zu status und seitentyp'),\n  },\n};\n\nreturn [\n  {\n    json: {\n      system,\n      anfrage: fuellen(anfrage, { HEUTE: $now.toFormat('yyyy-MM-dd'), URL: abruf.url, TITEL: abruf._titel, SEITENTEXT: '{{SEITENTEXT}}' }),\n      seitentext: abruf._text,\n      schema: SCHEMA,\n      anbieter_override: row.anbieter_override || '',\n      funktion: 'fakten', // Modell laut Einstellungen: \"Fakten auslesen\"\n      kontext: { id: abruf.id, url: abruf.url },\n    },\n  },\n];"
+      },
+      "notes": "Setzt Prompt + Seitentext + JSON-Schema zusammen.",
+      "notesInFlow": true
+    },
+    {
+      "id": "8a90ae25-349b-4b44-99fc-940c93a7ffb5",
+      "name": "Stufe 4: KI-Extraktion",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3600,
+        200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf (Claude oder Ollama).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "66db9a78-8db2-43f4-a0ea-43ab3d2d1c89",
+      "name": "Stufe 5: Aussortieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const abruf = $('Abruf auswerten').first().json;\nconst row = $('Wenn von anderem Workflow aufgerufen').first().json;\nconst k = $json; // Ergebnis von \"00 KI-Aufruf\"\nconst maxAlter = Number(row.max_alter_tage || 60);\n\nconst out = { ...abruf };\ndelete out._text;\nout.modell_extraktion = `${k.anbieter || '?'}:${k.modell || '?'}`;\n\nif (!k.ok) {\n  out.status = 'fehler';\n  out.hinweis = 'KI-Fehler: ' + (k.fehler || 'keine Antwort');\n  out.dubletten_schluessel = '';\n  return [{ json: out }];\n}\n\nconst d = k.daten;\nconst leer = (v) => (v === undefined || v === null ? '' : String(v).trim());\nfor (const f of ['veroeffentlichungsdatum', 'jobtitel', 'firma', 'ort', 'remote', 'remote_regel_wortlaut', 'gehalt', 'vertragsform', 'bewerbungsweg', 'kurze_zusammenfassung', 'begruendung']) {\n  out[f] = leer(d[f]);\n}\n\n// Gegen erfundene Daten: Steht die genannte Textstelle wirklich auf der Seite?\n// (Kleine Modelle setzen gern einfach das heutige Datum ein.)\nconst zitat = leer(d.datum_zitat);\nconst normal = (s) => String(s).toLowerCase().replace(/\\s+/g, ' ').trim();\nconst belegt = zitat.length >= 3 && normal(abruf._text || '').includes(normal(zitat));\nlet datumHinweis = zitat ? `Datum aus: \"${zitat}\"` : '';\nif (out.veroeffentlichungsdatum && !belegt) {\n  datumHinweis = zitat ? `Datum verworfen (\"${zitat}\" steht nicht im Text)` : 'Datum verworfen (keine Textstelle genannt)';\n  out.veroeffentlichungsdatum = '';\n}\n\n// Alter der Stelle in Tagen\nlet alter = null;\nif (/^\\d{4}-\\d{2}-\\d{2}$/.test(out.veroeffentlichungsdatum)) {\n  const t = Date.parse(out.veroeffentlichungsdatum + 'T00:00:00Z');\n  if (!isNaN(t)) alter = Math.max(0, Math.floor((Date.now() - t) / 86400000));\n}\nout.alter_tage = alter;\n\n// ---- Regeln zum Aussortieren ----\nif (d.seitentyp !== 'einzelne_stelle') {\n  out.status = 'tot';\n  out.hinweis = d.seitentyp === 'stellenliste' ? 'Keine einzelne Stelle (Übersicht/Liste)' : 'Keine Stellenanzeige';\n} else if (d.status === 'abgelaufen') {\n  out.status = 'abgelaufen';\n  out.hinweis = 'Laut Seite abgelaufen';\n} else if (alter !== null && alter > maxAlter) {\n  out.status = 'zu_alt';\n  out.hinweis = `Veröffentlicht vor ${alter} Tagen (Grenze: ${maxAlter})`;\n} else if (alter === null) {\n  out.status = 'unklar';\n  out.hinweis = 'Kein Veröffentlichungsdatum gefunden – bleibt drin';\n} else if (d.status === 'aktiv') {\n  out.status = 'aktiv';\n  out.hinweis = '';\n} else {\n  out.status = 'unklar';\n  out.hinweis = 'Status laut KI unklar';\n}\nif (datumHinweis) out.hinweis = (out.hinweis ? out.hinweis + '; ' : '') + datumHinweis;\nif (k.gekuerzt) out.hinweis = (out.hinweis ? out.hinweis + '; ' : '') + 'Seitentext für KI gekürzt';\n\n// Schlüssel, um dieselbe Stelle unter anderer Adresse zu erkennen\nconst norm = (s) =>\n  s.toLowerCase()\n    .replace(/\\((m|w|f|d|x|all genders|gn)[^)]*\\)/g, '')\n    .replace(/[^a-z0-9äöüß]+/g, ' ')\n    .trim();\nout.dubletten_schluessel = out.firma && out.jobtitel ? norm(out.firma) + '|' + norm(out.jobtitel) : '';\nreturn [{ json: out }];"
+      },
+      "notes": "abgelaufen / zu_alt / keine Einzelstelle / aktiv / unklar. Maximales Alter kommt aus Workflow A bzw. B.",
+      "notesInFlow": true
+    },
+    {
+      "id": "c528ca27-ff25-4b1e-8cae-9c28c28f9333",
+      "name": "Dubletten suchen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "text_hash",
+              "condition": "eq",
+              "keyValue": "={{ $json.text_hash || '__keiner__' }}"
+            },
+            {
+              "keyName": "dubletten_schluessel",
+              "condition": "eq",
+              "keyValue": "={{ $json.dubletten_schluessel || '__keiner__' }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "notes": "Gibt es schon eine Zeile mit gleichem Seitentext oder gleicher Firma+Titel?",
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "6b557214-204d-4c49-b19d-334456e5b16c",
+      "name": "Dubletten prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const cur = $('Stufe 5: Aussortieren').first().json;\nconst treffer = $input\n  .all()\n  .map((i) => i.json)\n  .filter((r) => r && r.id && r.id !== cur.id && r.status !== 'duplikat' && r.status !== 'neu');\nconst out = { ...cur };\nif (['aktiv', 'unklar'].includes(cur.status) && treffer.length > 0) {\n  treffer.sort((a, b) => a.id - b.id);\n  out.status = 'duplikat';\n  out.duplikat_von = treffer[0].url;\n  out.hinweis = `Gleiche Stelle wie ${treffer[0].url}`;\n}\nreturn [{ json: out }];"
+      },
+      "notes": "Treffer → Status \"duplikat\" + Verweis auf die erste Zeile. Wird nicht bewertet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "9018a015-76c8-43b8-a85f-21adb11cc8fd",
+      "name": "Für Tabelle aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Nur Felder, die es als Spalte in der Tabelle \"jobs\" gibt. Hilfsfelder (mit \"_\") fallen weg.\nconst SPALTEN = [\"url\",\"domain\",\"linktext\",\"erstmals_gesehen\",\"nicht_mehr_gelistet\",\"status\",\"freigabe\",\"hinweis\",\"http_status\",\"final_url\",\"cache_id\",\"screenshot\",\"text_hash\",\"dubletten_schluessel\",\"duplikat_von\",\"abgerufen_am\",\"veroeffentlichungsdatum\",\"alter_tage\",\"jobtitel\",\"firma\",\"ort\",\"remote\",\"remote_regel_wortlaut\",\"gehalt\",\"vertragsform\",\"bewerbungsweg\",\"kurze_zusammenfassung\",\"begruendung\",\"modell_extraktion\",\"passung_score\",\"bewertung\",\"bewertung_begruendung\",\"pflichtkriterien_erfuellt\",\"luecken\",\"offene_fragen\",\"warnsignale\",\"modell_bewertung\",\"bewertet_am\"];\nreturn $input.all().map((i) => {\n  const r = i.json;\n  const o = { id: r.id };\n  for (const s of SPALTEN) {\n    if (r[s] === undefined) continue;\n    o[s] = r[s] !== null && typeof r[s] === 'object' ? JSON.stringify(r[s]) : r[s];\n  }\n  return { json: o };\n});"
+      },
+      "notes": "Räumt das Ergebnis auf, damit es genau zu den Tabellenspalten passt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "0eb2e773-36b6-41d2-aa50-ecf45bcff9e7",
+      "name": "In Tabelle \"jobs\" speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4800,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Aktualisiert genau diese Zeile (über die id).",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Wenn von anderem Workflow aufgerufen": {
+      "main": [
+        [
+          {
+            "node": "Schon abgerufen? (A1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schon abgerufen? (A1)": {
+      "main": [
+        [
+          {
+            "node": "Gespeicherte Seite laden",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stufe 2: Schnellcheck (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gespeicherte Seite laden": {
+      "main": [
+        [
+          {
+            "node": "Abruf auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 2: Schnellcheck (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Schnellcheck auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schnellcheck auswerten": {
+      "main": [
+        [
+          {
+            "node": "Schon tot?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schon tot?": {
+      "main": [
+        [
+          {
+            "node": "Für Tabelle aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stufe 3: Browser-Abruf (Playwright)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 3: Browser-Abruf (Playwright)": {
+      "main": [
+        [
+          {
+            "node": "Cookie-Banner blockiert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cookie-Banner blockiert?": {
+      "main": [
+        [
+          {
+            "node": "Consent-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abruf auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consent-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Consent-Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consent-Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "KI: Cookie-Button wählen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI: Cookie-Button wählen": {
+      "main": [
+        [
+          {
+            "node": "Gewählten Button übernehmen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gewählten Button übernehmen": {
+      "main": [
+        [
+          {
+            "node": "Stufe 3b: Abruf mit gewähltem Button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 3b: Abruf mit gewähltem Button": {
+      "main": [
+        [
+          {
+            "node": "Abruf auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abruf auswerten": {
+      "main": [
+        [
+          {
+            "node": "Weiter zur KI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter zur KI?": {
+      "main": [
+        [
+          {
+            "node": "Extraktions-Prompt laden",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Für Tabelle aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraktions-Prompt laden": {
+      "main": [
+        [
+          {
+            "node": "Extraktions-Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraktions-Anfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "Stufe 4: KI-Extraktion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 4: KI-Extraktion": {
+      "main": [
+        [
+          {
+            "node": "Stufe 5: Aussortieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 5: Aussortieren": {
+      "main": [
+        [
+          {
+            "node": "Dubletten suchen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dubletten suchen": {
+      "main": [
+        [
+          {
+            "node": "Dubletten prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dubletten prüfen": {
+      "main": [
+        [
+          {
+            "node": "Für Tabelle aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Für Tabelle aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "In Tabelle \"jobs\" speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Sub-Workflow: prüft genau eine Stelle und speichert das Ergebnis.",
+  "tags": [],
+  "isArchived": false
+}

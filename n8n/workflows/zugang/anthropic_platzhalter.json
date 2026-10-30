@@ -1,0 +1,1 @@
+[{"id":"jaAnthropicKey01","name":"Anthropic API Key","type":"httpHeaderAuth","data":{"name":"x-api-key","value":"HIER-DEINEN-API-KEY-EINTRAGEN"}}]

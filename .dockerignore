@@ -1,0 +1,9 @@
+# Nur, was das Image braucht – Daten, Git, Workflows und Dev-Abhängigkeiten bleiben draußen
+.git
+data
+n8n
+browser-erweiterung
+docs
+**/node_modules
+**/dist
+.env

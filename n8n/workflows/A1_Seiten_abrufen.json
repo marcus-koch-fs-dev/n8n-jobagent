@@ -1,0 +1,645 @@
+{
+  "id": "jaSeitenAbrufA01",
+  "name": "1 Sammeln · Schritt 2 · Seiten laden (ohne KI)",
+  "nodes": [
+    {
+      "id": "fdfbc056-43a6-41c0-8bb4-212ee8458a2c",
+      "name": "Notiz 62113a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -330
+      ],
+      "parameters": {
+        "content": "## A1 – Seiten abrufen (ohne KI)\nLädt alle Stellen mit Status **neu** im Browser, speichert Text + Screenshot im Cache und setzt den Status auf **abgerufen**. Die KI wird hier **nicht** benutzt – die GPU bleibt frei.\n\n- Es werden immer 3 Seiten gleichzeitig geladen (Schleifen-Knoten, passend zu MAX_CONCURRENCY im Browser-Dienst)\n- Tote Links, Login/Captcha und Fehler werden wie in Stufe 2–3 erkannt.\n- Danach: **A2 Fakten auslesen** (KI, liest aus dem Cache – auch Tage später).\n\nAbbrechen ist jederzeit ok: Beim nächsten Start geht es mit den restlichen „neu“-Zeilen weiter.",
+        "width": 760,
+        "height": 330,
+        "color": 4
+      }
+    },
+    {
+      "id": "244ff4ca-68ea-473e-a1d7-92180d33b697",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a3491e85-e2a7-4325-9d64-456d12078cbe",
+      "name": "⚙️ Einstellungen A1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d9afe8f6-eb7b-4c17-be23-98c5254e9c7a",
+              "name": "max_stellen",
+              "value": 1000,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Wie viele Stellen höchstens.",
+      "notesInFlow": true
+    },
+    {
+      "id": "295d558d-b610-410b-a453-07d1b763f3f1",
+      "name": "Neue Links holen",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "neu"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": "={{ $json.max_stellen }}"
+      },
+      "notes": "Status \"neu\".",
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "356ef460-a7f1-4f78-9af0-4fcea05069d4",
+      "name": "Gibt es neue Links?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8b347a5a-949b-418d-95b4-101e1d75f709",
+              "leftValue": "={{ !!$json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "false = nichts zu tun → direkt weiter zum nächsten Schritt.",
+      "notesInFlow": true
+    },
+    {
+      "id": "532db09d-353a-4067-b779-c6438e0a5e3f",
+      "name": "Start per Kette",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kette-schritt-2",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Automatischer Start durch den vorherigen Schritt (POST /webhook/kette-schritt-2).",
+      "notesInFlow": true,
+      "webhookId": "7137dadc-8cf5-4739-9f1d-b0ca9a09190e"
+    },
+    {
+      "id": "f848a222-f9f2-4733-bb44-371b107c424e",
+      "name": "Weiter zu Schritt 3?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fc0a3d8c-e0cb-4a7c-a2aa-a6535381998b",
+              "leftValue": "={{ ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) >= 3 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "Nur beim automatischen Lauf (bzw. wenn eingestellt).",
+      "notesInFlow": true
+    },
+    {
+      "id": "5c29acae-fbee-4af7-b90d-a03a8b73e343",
+      "name": "Schritt 3 starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5678/webhook/kette-schritt-3",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ bis_schritt: ($('Start per Kette').isExecuted ? Number(($('Start per Kette').first().json.body || {}).bis_schritt || 0) : 0) }) }}"
+      },
+      "notes": "Gibt den Staffelstab weiter – der nächste Schritt läuft als eigener Lauf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "96e92a5d-6c44-4df1-b3fa-ab66a2658506",
+      "name": "Schleife: je N Seiten gleichzeitig",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "batchSize": 3,
+        "options": {}
+      },
+      "notes": "Gibt N Stellen auf einmal weiter – die HTTP-Knoten danach arbeiten sie gleichzeitig ab.",
+      "notesInFlow": true
+    },
+    {
+      "id": "72f1d138-2d13-4f9b-8738-e96bb7d14f73",
+      "name": "Stufe 2: Schnellcheck (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 20000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "notes": "Alle Stellen des Pakets gleichzeitig.",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a21c94e9-2c46-447c-846c-b02b0c79affa",
+      "name": "Stufe 3: Browser-Abruf (Playwright)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://browser:3000/fetch",
+        "options": {
+          "timeout": 300000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $('Schleife: je N Seiten gleichzeitig').item.json.url }) }}"
+      },
+      "notes": "Ebenfalls gleichzeitig – der Browser-Dienst begrenzt auf MAX_CONCURRENCY.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "417512ae-c1f9-452b-aab1-89857f1dcd0d",
+      "name": "Auswerten (ohne KI)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Schleife: je N Seiten gleichzeitig').item.json;\nconst quick = $('Stufe 2: Schnellcheck (HTTP)').item.json;\nconst r = $json;\n\n// Hinweis: Im n8n-Code-Knoten gibt es kein \"new URL(...)\".\n// Deshalb zerlegen wir Adressen mit einem regulären Ausdruck selbst.\nfunction zerlegeUrl(roh) {\n  const m = String(roh || '').trim().match(/^(https?):\\/\\/([^\\/?#]+)([^?#]*)(\\?[^#]*)?(#.*)?$/i);\n  if (!m) return null;\n  return { protokoll: m[1].toLowerCase(), host: m[2].toLowerCase(), pfad: m[3] || '/', query: m[4] || '' };\n}\n\n// Macht aus einer relativen Weiterleitung (\"/karriere\") eine volle Adresse.\nfunction absoluteUrl(ziel, basis) {\n  if (/^https?:\\/\\//i.test(ziel)) return ziel;\n  const b = zerlegeUrl(basis);\n  if (!b) return ziel;\n  if (ziel.startsWith('//')) return b.protokoll + ':' + ziel;\n  if (ziel.startsWith('/')) return b.protokoll + '://' + b.host + ziel;\n  return b.protokoll + '://' + b.host + b.pfad.replace(/[^\\/]*$/, '') + ziel;\n}\n\n// Zeigt eine Adresse nur noch auf eine allgemeine Karriere- oder Startseite?\nfunction istAllgemeineSeite(ziel, original) {\n  const z = zerlegeUrl(ziel);\n  const o = zerlegeUrl(original);\n  if (!z || !o) return false;\n  const pfad = (u) => u.pfad.replace(/\\/+$/, '').toLowerCase();\n  const host = (u) => u.host.replace(/^www\\./, '');\n  if (host(z) === host(o) && pfad(z) === pfad(o)) return false; // z. B. nur http -> https\n  const p = pfad(z);\n  if (p === '') return true;\n  if (/^(\\/[a-z]{2}(-[a-z]{2})?)?(\\/(karriere|career|careers|jobs|job|stellenangebote|stellen|offene-stellen|jobboerse|join-us|joinus|vacancies|work-with-us|search|suche))*$/.test(p)) return true;\n  if (/[?&](error|expired|notfound|jobnotfound)=/i.test(z.query)) return true;\n  return false;\n}\n\nconst out = {\n  id: row.id,\n  http_status: r.httpStatus === undefined ? quick.statusCode || null : r.httpStatus,\n  final_url: r.finalUrl || '',\n  cache_id: r.cacheId || '',\n  screenshot: r.screenshotUrl || '',\n  text_hash: r.textHash || '',\n  abgerufen_am: r.abgerufenAm || new Date().toISOString(),\n};\nconst fehlerText = (x) => (x ? (typeof x === 'string' ? x : x.message || JSON.stringify(x)) : '');\nconst qCode = quick.statusCode || null;\nconst qLoc = quick.headers && (quick.headers.location || quick.headers.Location);\n\nif (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(fehlerText(quick.error))) {\n  out.status = 'tot';\n  out.hinweis = 'Domain existiert nicht (mehr)';\n} else if (qCode === 404 || qCode === 410) {\n  out.status = 'tot';\n  out.hinweis = `HTTP ${qCode}: Seite gibt es nicht mehr`;\n} else if (qCode >= 300 && qCode < 400 && qLoc && istAllgemeineSeite(absoluteUrl(qLoc, row.url), row.url)) {\n  out.status = 'tot';\n  out.hinweis = `Weiterleitung auf allgemeine Seite: ${absoluteUrl(qLoc, row.url)}`;\n} else if (!r.ok) {\n  out.status = 'fehler';\n  out.hinweis = 'Abruf fehlgeschlagen: ' + (fehlerText(r.error) || 'unbekannt');\n} else if (r.httpStatus === 404 || r.httpStatus === 410) {\n  out.status = 'tot';\n  out.hinweis = `HTTP ${r.httpStatus}`;\n} else if (istAllgemeineSeite(r.finalUrl, row.url)) {\n  out.status = 'tot';\n  out.hinweis = `Weitergeleitet auf allgemeine Seite: ${r.finalUrl}`;\n} else if (r.blocked && r.blocked.any) {\n  out.status = 'wartet_auf_freigabe';\n  out.hinweis = 'Freigabe nötig: ' + (r.blocked.reasons || []).join(', ');\n} else if ((r.textLength || 0) < 200) {\n  out.status = 'fehler';\n  out.hinweis = 'Seite enthält kaum Text';\n} else {\n  out.status = 'abgerufen';\n  out.hinweis = 'Seite gespeichert – KI-Auswertung folgt (A2)';\n}\nreturn { json: out };",
+        "mode": "runOnceForEachItem"
+      },
+      "notes": "tot / Freigabe / Fehler – oder \"abgerufen\" (bereit für A2).",
+      "notesInFlow": true
+    },
+    {
+      "id": "b33a3c8f-bbe0-4220-9013-41cad30aaf41",
+      "name": "In Tabelle \"jobs\" speichern",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "jobs"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "notes": "Speichert Status + Cache-Verweis.",
+      "notesInFlow": true
+    },
+    {
+      "id": "d65d3c13-e07a-47ee-ac84-fdd557b747e0",
+      "name": "Zusammenfassung",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const z = {};\nfor (const i of $input.all()) z[i.json.status || 'unbekannt'] = (z[i.json.status || 'unbekannt'] || 0) + 1;\nreturn [{ json: { abgerufen: $input.all().length, nach_status: z, naechster_schritt: 'Workflow \"A2 Fakten auslesen\" starten (braucht die GPU).' } }];"
+      },
+      "notes": "Wie viele Seiten in welchem Status.",
+      "notesInFlow": true
+    },
+    {
+      "id": "fe8fc439-1c8e-49ac-9488-482aaeca62bb",
+      "name": "Pause gedrückt?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        560
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://browser:3000/pause?schritt=Schritt%202%20%C2%B7%20Seiten%20laden",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "notes": "Fragt den Pause-Schalter ab (Knopf ⏸ auf der Ergebnis-Seite).",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "50b724d6-ecf8-4f11-aaf9-2b0a33c86689",
+      "name": "Angehalten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8c9e07ba-ff37-4d20-a7c2-aabcec420a22",
+              "leftValue": "={{ $json.pausiert === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "notes": "true = sauber aufhören; beim nächsten Start geht es mit den offenen Stellen weiter.",
+      "notesInFlow": true
+    },
+    {
+      "id": "521f76f4-b067-44ed-85a7-9b0f97f4b7ca",
+      "name": "Angehalten – später fortsetzen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { angehalten: true, hinweis: 'Pausiert. Mit „▶ Fortsetzen“ auf der Ergebnis-Seite geht es weiter.' } }];"
+      },
+      "notes": "Ende dieses Laufs (kein Staffelstab weiter).",
+      "notesInFlow": true
+    },
+    {
+      "id": "3eb19f58-b393-4b34-a411-546554bd1e5f",
+      "name": "Weiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        660
+      ],
+      "parameters": {
+        "jsCode": "// Nur die reinen Daten weitergeben (manche Knoten hängen Zusatzinfos an, die hier stören)\nreturn $('In Tabelle \"jobs\" speichern').all().map((i) => ({ json: i.json }));"
+      },
+      "notes": "Nicht pausiert → nächste Runde der Schleife.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Einstellungen A1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start per Kette": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Einstellungen A1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Einstellungen A1": {
+      "main": [
+        [
+          {
+            "node": "Neue Links holen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Neue Links holen": {
+      "main": [
+        [
+          {
+            "node": "Gibt es neue Links?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es neue Links?": {
+      "main": [
+        [
+          {
+            "node": "Schleife: je N Seiten gleichzeitig",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter zu Schritt 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zusammenfassung": {
+      "main": [
+        [
+          {
+            "node": "Weiter zu Schritt 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter zu Schritt 3?": {
+      "main": [
+        [
+          {
+            "node": "Schritt 3 starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schleife: je N Seiten gleichzeitig": {
+      "main": [
+        [
+          {
+            "node": "Zusammenfassung",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stufe 2: Schnellcheck (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 2: Schnellcheck (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Stufe 3: Browser-Abruf (Playwright)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stufe 3: Browser-Abruf (Playwright)": {
+      "main": [
+        [
+          {
+            "node": "Auswerten (ohne KI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auswerten (ohne KI)": {
+      "main": [
+        [
+          {
+            "node": "In Tabelle \"jobs\" speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Tabelle \"jobs\" speichern": {
+      "main": [
+        [
+          {
+            "node": "Pause gedrückt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause gedrückt?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Angehalten?": {
+      "main": [
+        [
+          {
+            "node": "Angehalten – später fortsetzen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Weiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter": {
+      "main": [
+        [
+          {
+            "node": "Schleife: je N Seiten gleichzeitig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Stufe 2–3 für alle neuen Links, ohne KI.",
+  "tags": [],
+  "isArchived": false
+}

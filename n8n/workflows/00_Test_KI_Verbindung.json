@@ -1,0 +1,155 @@
+{
+  "id": "jaTestKIVerbind1",
+  "name": "9 Technik · Test: antwortet die KI?",
+  "nodes": [
+    {
+      "id": "c0a79bfe-e390-4b41-9fcc-c755be92603a",
+      "name": "Notiz 5727f2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ],
+      "parameters": {
+        "content": "## 00 Test: KI-Verbindung\nPrüft in wenigen Sekunden, ob Claude und Ollama antworten.\n\n- Im Knoten **⚙️ Test-Einstellungen** `anbieter` (claude/ollama) und `claude_modell` wählen.\n- **Execute workflow** → im letzten Knoten muss `ok: true` stehen.\n\nKostet bei Claude weniger als 1 Cent.",
+        "width": 620,
+        "height": 240,
+        "color": 4
+      }
+    },
+    {
+      "id": "fd806d28-df71-454e-a176-4aac34cbe627",
+      "name": "▶ Start (Testlauf ausführen)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {},
+      "notes": "Klick auf \"Execute workflow\" startet hier.",
+      "notesInFlow": true
+    },
+    {
+      "id": "4bd500f2-d09b-43d4-81c7-d9fceeb915a1",
+      "name": "⚙️ Test-Einstellungen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6bf47cce-3a15-46a8-906b-ac61cbfbd4e3",
+              "name": "anbieter",
+              "value": "claude",
+              "type": "string"
+            },
+            {
+              "id": "35615911-83e6-4a41-85ad-8f98f7523c8d",
+              "name": "claude_modell",
+              "value": "claude-sonnet-5-5",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Was getestet wird.",
+      "notesInFlow": true
+    },
+    {
+      "id": "644cd6ea-1658-48f9-849b-caed8d124dc6",
+      "name": "Testfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const e = $input.first().json;\nreturn [\n  {\n    json: {\n      system: 'Du antwortest kurz und auf Deutsch.',\n      anfrage: 'Ist eine Stelle mit dem Satz \"Remote – Germany only\" für jemanden geeignet, der aus dem Ausland arbeiten will? Antworte mit ja/nein und einem Satz Begründung.',\n      seitentext: '',\n      schema: {\n        type: 'object',\n        additionalProperties: false,\n        required: ['antwort', 'begruendung'],\n        properties: { antwort: { type: 'string', enum: ['ja', 'nein'] }, begruendung: { type: 'string' } },\n      },\n      anbieter_override: e.anbieter,\n      claude_modell_override: e.claude_modell,\n      kontext: {},\n    },\n  },\n];"
+      },
+      "notes": "Eine einfache Testfrage mit festem JSON-Format.",
+      "notesInFlow": true
+    },
+    {
+      "id": "5d08c593-cdd2-4792-8bd2-865fe54af32c",
+      "name": "KI fragen",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "jaKIAufruf000001"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Ruft 00 KI-Aufruf auf.",
+      "notesInFlow": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "▶ Start (Testlauf ausführen)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Test-Einstellungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Test-Einstellungen": {
+      "main": [
+        [
+          {
+            "node": "Testfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testfrage bauen": {
+      "main": [
+        [
+          {
+            "node": "KI fragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "description": "Prüft, ob Claude bzw. Ollama antworten.",
+  "tags": [],
+  "isArchived": false
+}

@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Farben (Hell + Dunkel), bewusst weich: kein reines Weiß, kein Fast-Schwarz. Die Namen --bg, --fg, --card … bleiben,
+   darunter hängen die shadcn-Variablen, damit Komponenten gleich aussehen. */
+:root {
+  --bg:#ebe9e3; --fg:#1d1d1b; --muted:#5b5a54; --card:#f9f8f4; --line:#c8c3b7; --soft:#e3e0d8;
+  --accent:#2a5547; --good:#276b43; --mid:#8a5f0c; --bad:#9a3b31; --info:#2f4f80;
+  --good-bg:#d9ebe0; --mid-bg:#f1e3c4; --bad-bg:#f0d6d2; --info-bg:#d6e0f0;
+  --accent-fg:#ffffff;
+  --radius: 0.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#1e1f22; --fg:#ecebe7; --muted:#b3b1aa; --card:#282a2e; --line:#4a4d55; --soft:#313338;
+    --accent:#8fc9b6; --good:#84cea1; --mid:#e8bd68; --bad:#ee9489; --info:#9bb9ea;
+    --good-bg:#25402f; --mid-bg:#463a1d; --bad-bg:#4a2b28; --info-bg:#28364d;
+    --accent-fg:#141413;
+  }
+}
+/* Dunkel erzwungen per Theme-Knopf (unabhängig vom System) */
+:root[data-theme="dark"] {
+  --bg:#1e1f22; --fg:#ecebe7; --muted:#b3b1aa; --card:#282a2e; --line:#4a4d55; --soft:#313338;
+  --accent:#8fc9b6; --good:#84cea1; --mid:#e8bd68; --bad:#ee9489; --info:#9bb9ea;
+  --good-bg:#25402f; --mid-bg:#463a1d; --bad-bg:#4a2b28; --info-bg:#28364d;
+  --accent-fg:#141413;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-muted: var(--soft);
+  --color-muted-foreground: var(--muted);
+  --color-destructive: var(--bad);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  --color-soft: var(--soft);
+  --color-good: var(--good);
+  --color-mid: var(--mid);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-good-bg: var(--good-bg);
+  --color-mid-bg: var(--mid-bg);
+  --color-bad-bg: var(--bad-bg);
+  --color-info-bg: var(--info-bg);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font: 15px/1.55 "Nunito Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+}
