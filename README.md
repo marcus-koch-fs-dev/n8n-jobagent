@@ -91,7 +91,7 @@ Zurücksetzen: `docker compose down -v` löscht alle Volumes des Projekts (**all
 | `n8n/workflows/` | n8n-Workflows als JSON |
 | `n8n/prompts/` | Prompts, werden bei jedem Lauf neu gelesen |
 | `browser-erweiterung/` | Browser-Erweiterung für Tab-Gruppen |
-| `docs/` | Bedienung, API, Umbau-Pläne |
+| `docs/` | Bedienung und API |
 | `data/` | Deine Daten, nie im Repo |
 
 ## Entwicklung
